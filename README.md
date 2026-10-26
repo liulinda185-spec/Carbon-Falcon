@@ -1,5 +1,7 @@
 # UCST-CCIF
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.XXXXXXX.svg)](https://doi.org/10.5281/zenodo.XXXXXXX) <!-- Replace XXXX with your minted DOI after publishing the first release (Zenodo auto-mints it) -->
+
 **Conservation-Constrained Carbon Flux Integrated Framework** — auditable, cross-scale carbon accounting from enterprise Scope 1 to coastal blue carbon.
 
 ## What it does
@@ -56,10 +58,17 @@ Features: enterprise CSV → Scope 1 estimate, GBA wetland biogenic demo, leakag
 pytest tests/ -v
 ```
 
+## Zenodo DOI
+
+This repository is linked to Zenodo. To mint a DOI:
+1. Publish a GitHub release from a tag (e.g. `v0.2.0`) — Zenodo archives it automatically.
+2. Zenodo creates a record and mints a DOI (`10.5281/zenodo.XXXXXXXX`).
+3. Paste the DOI into the badge at the top of this README and into the Citation section below.
+4. Add the DOI to `pyproject.toml` (in `[project.urls]`) if desired.
 
 ## Citation
 
-Liu, Y. & Cui, W. (2026). *Integrating Ecological Carbon Fluxes Across Scales: A Conservation-Constrained, Falsification-Based Modelling Framework based on Unified Complex System Theory (UCST)*. Ecological Modelling.
+Liu, Y. & Cui, W. (2026). *Integrating Ecological Carbon Fluxes Across Scales: A Conservation-Constrained, Falsification-Based Modelling Framework based on Unified Complex System Theory (UCST)*. Ecological Modelling. DOI: `10.5281/zenodo.XXXXXXX` *(minted via Zenodo GitHub integration; update after first release)*.
 
 ## License
 
