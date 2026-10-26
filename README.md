@@ -58,6 +58,22 @@ Features: enterprise CSV → Scope 1 estimate, GBA wetland biogenic demo, leakag
 pytest tests/ -v
 ```
 
+## Roadmap — ML/AI as the next step
+
+The current release is a **process-based + statistical** toolkit (no ML training): the continuum model, scipy-optimised M0–M3 comparison, Monte Carlo sampling and the correlation-based leakage audit are all white-box by design. The next development phase adds machine learning in **thin, auditable layers only** — ML never replaces the core ledger, the leakage audit, or the conservation residual ε_C:
+
+| Priority | Capability | What it adds | Why it fits OCIP |
+|---|---|---|---|
+| **P1** | ML emulator priors (LPJ-GUESS RF/NN emulator, GMD 2025) | Cheap, reproducible GPP/NEE baseline grids as M0 priors | Replaces costly full-DGVM runs while keeping the prior pipeline read-only and testable |
+| **P2** | Conformal prediction (e.g. MAPIE) | Honest prediction intervals around all M0–M3 outputs | Strengthens the falsification narrative and makes MRV uncertainty claims defensible |
+| **P3** | Double ML / causal forests | M3 counterfactual attribution and CCER/CRCF additionality | Directly matches Article 6.4 baseline-and-additionality requirements |
+| **P4** | Geospatial foundation models (e.g. Prithvi-EO-2.0, fine-tuned on FLUXNET) + deep ensembles | Up-scaled GPP priors and covariate-drift detection | Provides operational GPP priors for GBA; drift alarms flag model degradation before it misleads clients |
+
+**Implementation contract for the ML phase:**
+- Ship as an optional `ucst_ccif.ml` module with its own test suite; keep core dependencies lean (e.g. scikit-learn + MAPIE as extras).
+- Every ML feature must pass the leakage audit before acceptance — a predictor that is algebraically derived from the target is rejected by construction.
+- Validate site-to-site at GBA before any client-facing use; never adopt a foundation-model output without a local benchmark.
+
 ## Zenodo DOI
 
 This repository is linked to Zenodo. To mint a DOI:
