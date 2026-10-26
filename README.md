@@ -56,14 +56,6 @@ Features: enterprise CSV → Scope 1 estimate, GBA wetland biogenic demo, leakag
 pytest tests/ -v
 ```
 
-## Zenodo DOI
-
-To mint a DOI:
-1. Tag a release: `git tag v0.1.0 && git push origin v0.1.0`
-2. Go to [zenodo.org](https://zenodo.org), sign in with GitHub.
-3. Enable the `Carbon-Falcon` repository in Zenodo.
-4. Publish a new release on GitHub — Zenodo automatically archives it and mints a DOI.
-5. Add the DOI to `pyproject.toml` and this README.
 
 ## Citation
 
