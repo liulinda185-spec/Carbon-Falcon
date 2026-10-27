@@ -1,6 +1,6 @@
 # UCST-CCIF
 
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.XXXXXXX.svg)](https://doi.org/10.5281/zenodo.XXXXXXX) <!-- Replace XXXX with your minted DOI after publishing the first release (Zenodo auto-mints it) -->
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.XXXXXXX.svg)](https://doi.org/10.5281/zenodo.XXXXXXX) <!-- Replace XXXX with your minted DOI after publishing the release (Zenodo auto-mints it) -->
 
 **Conservation-Constrained Carbon Flux Integrated Framework** — auditable, cross-scale carbon accounting from enterprise Scope 1 to coastal blue carbon.
 
@@ -10,10 +10,11 @@
 - **Leakage audit** (`ucst_ccif.leakage`): three-step detector that flags predictors algebraically derived from NEE (GPP, ER, cumulative balance) before they fake model performance.
 - **Nested M0–M3 comparison** (`ucst_ccif.models`): scipy-optimized models where each added layer must justify itself out-of-sample.
 - **Monte Carlo uncertainty** (`ucst_ccif.uncertainty`): parameter ensemble with 90% confidence intervals.
-- **MVP integration kernels (v0.2.0)**:
+- **MVP integration kernels (v0.2.1)**:
   - `rothc_lite` — RothC 4-pool soil-C kernel (monthly, date-stamped inputs)
   - `bluecarbon_lookups` — InVEST-style mangrove/saltmarsh/seagrass stocks, burial, CH4
   - `dndc_lite` — rice CH4 Tier-1 (IPCC scaling factors, water-regime management table)
+  - `landfill` — landfill CH4 Tier-1 kernel (IPCC 2006/2019: MSW × DOC × DOC_F × F × (1−OX) × MCF; 5 landfill management types; AR5/AR6 GWP display)
   - `threepg_lookups` — GBA subtropical species parameters + light NPP scoping
   - `raymond_evasion` — inland-water CO2 evasion (gas-transfer, Raymond-2013)
   - `netcdf_priors` — read-only prior registry/client for CAMS, FLUXCOM, SoilGrids, NASA CMS mangrove, SOCAT, CEADs
@@ -50,7 +51,7 @@ print(f"Annual NEE: {state.nee.mean()*365:.1f} gC m-2 yr-1")
 streamlit run app/streamlit_app.py
 ```
 
-Features: enterprise CSV → Scope 1 estimate, GBA wetland biogenic demo, leakage audit, NGFS V5 scenario lookup, ISO 14064-3 PDF export.
+Nine tabs: **Scope 1/2/3** enterprise inventory (MEE factors, Guangdong grid), **Biogenic** GBA wetland flux demo, **Leakage** audit, **NGFS V5** scenarios, **ISO 14064-3 PDF** export, **Anthropogenic ledger** (HK EPD 2023 sectors, Guangdong CEADs 2022, Global Carbon Budget 2025, CH4 by sector — rice + landfill, CCER mangrove restoration lookup, anthropogenic-vs-nature balance sheet), and a **Data guide** (free data-source map, CSV upload setup, LEAKY pattern guide, unit conversions, end-to-end worked example).
 
 ## Tests
 
@@ -77,7 +78,7 @@ The current release is a **process-based + statistical** toolkit (no ML training
 ## Zenodo DOI
 
 This repository is linked to Zenodo. To mint a DOI:
-1. Publish a GitHub release from a tag (e.g. `v0.2.0`) — Zenodo archives it automatically.
+1. Publish a GitHub release from a tag (e.g. `v0.2.1`) — Zenodo archives it automatically.
 2. Zenodo creates a record and mints a DOI (`10.5281/zenodo.XXXXXXXX`).
 3. Paste the DOI into the badge at the top of this README and into the Citation section below.
 4. Add the DOI to `pyproject.toml` (in `[project.urls]`) if desired.
