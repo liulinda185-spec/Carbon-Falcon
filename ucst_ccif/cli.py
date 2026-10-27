@@ -52,7 +52,8 @@ def _cmd_run(args) -> int:
 
 def _cmd_audit(args) -> int:
     df = pd.read_csv(args.csv)
-    predictors = [c for c in df.columns if c != args.target]
+    predictors = [c for c in df.columns
+                  if c != args.target and pd.api.types.is_numeric_dtype(df[c])]
     report = audit_leakage(df, args.target, predictors)
     print(report.summary())
     return 0
@@ -60,7 +61,8 @@ def _cmd_audit(args) -> int:
 
 def _cmd_compare(args) -> int:
     df = pd.read_csv(args.csv)
-    exo = args.exo.split(",")
+    exo = [c for c in args.exo.split(",")
+           if pd.api.types.is_numeric_dtype(df[c])]
     results = compare_m0_m1(df, args.target, exo,
                             calib_end_year=args.calib_end)
     for name, r in results.items():

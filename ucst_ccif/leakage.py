@@ -76,13 +76,21 @@ def audit_leakage(df: pd.DataFrame,
     LeakageReport with classification, correlations, and flags.
     """
     report = LeakageReport()
-    y = df[target_col].values
+    try:
+        y = np.asarray(df[target_col].values, dtype=float)
+    except (TypeError, ValueError) as e:
+        raise ValueError(
+            f"target column {target_col!r} is not numeric: {e}"
+        ) from e
 
     for col in predictor_cols:
         if col not in df.columns:
             continue
         report.classified[col] = classify_predictor(col)
-        x = df[col].values
+        try:
+            x = np.asarray(df[col].values, dtype=float)
+        except (TypeError, ValueError):
+            continue  # non-numeric column (e.g. date) is not a predictor
         mask = np.isfinite(x) & np.isfinite(y)
         if mask.sum() < 10:
             report.correlations[col] = float("nan")

@@ -144,6 +144,8 @@ def compare_m0_m1(df: pd.DataFrame, target: str,
     df["doy"] = df["date"].dt.dayofyear
     df["month"] = df["date"].dt.month
     df["year"] = df["date"].dt.year
+    needed = [target] + list(exo_cols) + [disturbance_col]
+    df = df.dropna(subset=needed)
     df = compute_conservation_state(df, exo_cols)
 
     calib = df[df["year"] <= calib_end_year].copy()
