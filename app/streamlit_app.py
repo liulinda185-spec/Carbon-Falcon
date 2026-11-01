@@ -131,8 +131,8 @@ with tab_upload:
         "stock": ("area_ha,removal_tco2e\n"
                   "100.0,420.0\n"),
         "intervention": ("scenario,baseline_removal_tco2e,"
-                         "intervention_removal_tco2e,active_fraction\n"
-                         "wetland_restoration,300.0,420.0,0.4\n"),
+                          "intervention_removal_tco2e,active_fraction\n"
+                          "wetland_restoration,300.0,420.0,0.4\n"),
     }
     t1, t2, t3, t4 = st.columns(4)
     for col, key, label in ((t1, "activity", "Activity ledger"),
@@ -778,6 +778,41 @@ with tab_report:
     st.caption("Runs S1 (boundary) → S2 (factors) → S3 (conservation, Eq.1) → "
                "S4 (scale) → S5 (additionality, Eq.3) → S6 (leakage, Eq.7) → "
                "S7 (uncertainty) on the four ledgers uploaded in tab 0.")
+
+    st.markdown("""
+    <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:stretch;font-size:0.85rem;margin:6px 0 10px;">
+      <div style="flex:1 1 200px;background:#eef4fa;border:1px solid #b9cfe4;border-radius:10px;padding:10px;">
+        <b>📥 四账（Tab 0 上传）</b>
+        <div style="margin-top:6px;display:flex;flex-direction:column;gap:4px;">
+          <div style="border:1px solid #9db8d4;border-radius:6px;padding:4px 6px;background:#fff;">活动账<br/><span style="color:#5c6b7a;font-size:0.75rem;">scope·category·activity_key·quantity</span></div>
+          <div style="border:1px solid #9db8d4;border-radius:6px;padding:4px 6px;background:#fff;">通量账<br/><span style="color:#5c6b7a;font-size:0.75rem;">date·NEE_daily_total</span></div>
+          <div style="border:1px solid #9db8d4;border-radius:6px;padding:4px 6px;background:#fff;">碳库账<br/><span style="color:#5c6b7a;font-size:0.75rem;">area_ha·removal_tco2e</span></div>
+          <div style="border:1px solid #9db8d4;border-radius:6px;padding:4px 6px;background:#fff;">干预账<br/><span style="color:#5c6b7a;font-size:0.75rem;">scenario·baseline·intervention</span></div>
+        </div>
+      </div>
+      <div style="flex:2 1 380px;background:#fff;border:1px solid #d8dee4;border-radius:10px;padding:10px;">
+        <b>⚙️ 7 步流水线 run_audit()</b>
+        <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;align-items:center;">
+          <div style="border:1px solid #5c6b7a;border-radius:6px;padding:4px 6px;background:#f7f9fb;">S1 边界</div><span style="color:#5c6b7a;">→</span>
+          <div style="border:1px solid #5c6b7a;border-radius:6px;padding:4px 6px;background:#f7f9fb;">S2 因子</div><span style="color:#5c6b7a;">→</span>
+          <div style="border:1px solid #5c6b7a;border-radius:6px;padding:4px 6px;background:#f7f9fb;">S3 守恒</div><span style="color:#5c6b7a;">→</span>
+          <div style="border:1px solid #5c6b7a;border-radius:6px;padding:4px 6px;background:#f7f9fb;">S4 尺度</div><span style="color:#5c6b7a;">→</span>
+          <div style="border:1px solid #5c6b7a;border-radius:6px;padding:4px 6px;background:#f7f9fb;">S5 额外性</div><span style="color:#5c6b7a;">→</span>
+          <div style="border:1px solid #5c6b7a;border-radius:6px;padding:4px 6px;background:#f7f9fb;">S6 泄漏</div><span style="color:#5c6b7a;">→</span>
+          <div style="border:1px solid #5c6b7a;border-radius:6px;padding:4px 6px;background:#f7f9fb;">S7 不确定</div>
+        </div>
+        <div style="margin-top:6px;color:#5c6b7a;font-size:0.75rem;">S3: ε_C = 独立观测 − 企业声称 · S5: 主动触发 F_a vs 被动响应 F_p · S6: 泄漏三步</div>
+      </div>
+      <div style="flex:1 1 220px;background:#eaf6ec;border:1px solid #b7d9bd;border-radius:10px;padding:10px;">
+        <b>📤 8 件输出 + 证书</b>
+        <div style="margin-top:6px;color:#2c3e50;line-height:1.6;font-size:0.8rem;">
+          ① 边界清单 · ② 排放区间 · ③ 移除区间 · ④ 残差 ε_C<br/>
+          ⑤ 尺度残差 · ⑥ 泄漏 RYG 旗标 · ⑦ 归因分解 · ⑧ 不确定性预算
+        </div>
+        <div style="margin-top:6px;border:1px solid #3a7d44;border-radius:6px;padding:4px 6px;background:#fff;font-weight:600;">🏅 PASS / REVIEW / FAIL / INCOMPLETE</div>
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
 
     a1, a2, a3 = st.columns(3)
     with a1:

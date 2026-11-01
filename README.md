@@ -1,107 +1,144 @@
-# OCIP — Open Carbon Platform (Carbon Falcon)
+# UCST-CCIF
 
-[![Version](https://img.shields.io/badge/version-v0.3.0-blue)]()
-[![Tests](https://img.shields.io/badge/tests-75%2F75-green)]()
-[![License](https://img.shields.io/badge/license-Apache--2.0-gold)]()
+**Conservation-Constrained Carbon Flux Integrated Framework** — auditable, cross-scale carbon accounting from enterprise Scope 1 to coastal blue carbon.
 
-**OCIP (Open Carbon Platform)** is the independent carbon-verification layer for
-GBA enterprises, auditors and research teams, built on the **UCST-CCIF**
-(Conservation-Constrained Carbon Flux Integrated Framework) engine.
+## What it does
 
-> The audit is the product — not the number.
+- **Continuum model** (`ucst_ccif.compartments`): 12-pool daily land–river–coastal carbon model with Q10 temperature response, moisture constraints, and a mass-balance residual ε_C that flags bookkeeping gaps.
+- **Leakage audit** (`ucst_ccif.leakage`): three-step detector that flags predictors algebraically derived from NEE (GPP, ER, cumulative balance) before they fake model performance.
+- **Nested M0–M3 comparison** (`ucst_ccif.models`): scipy-optimized models where each added layer must justify itself out-of-sample.
+- **Monte Carlo uncertainty** (`ucst_ccif.uncertainty`): parameter ensemble with 90% confidence intervals.
+- **MVP integration kernels (v0.2.0)**:
+  - `rothc_lite` — RothC 4-pool soil-C kernel (monthly, date-stamped inputs)
+  - `bluecarbon_lookups` — InVEST-style mangrove/saltmarsh/seagrass stocks, burial, CH4
+  - `dndc_lite` — rice CH4 Tier-1 (IPCC scaling factors, water-regime management table)
+  - `threepg_lookups` — GBA subtropical species parameters + light NPP scoping
+  - `raymond_evasion` — inland-water CO2 evasion (gas-transfer, Raymond-2013)
+  - `netcdf_priors` — read-only prior registry/client for CAMS, FLUXCOM, SoilGrids, NASA CMS mangrove, SOCAT, CEADs
+- **CLI**: `ucst-ccif run | audit | compare | rothc | blue | rice | evasion | priors | version`.
+- **Audit pipeline (v0.3.0)** — the OCIP "four ledgers → 7 steps → 8 artifacts" loop:
+  - `ucst_ccif.attribution` — Eq.1 conservation reconciliation (claim vs independent observation → ε_C, over-claim detection), Eq.3 additionality counterfactual (active trigger F_a vs passive response F_p), Eq.2 attribution split (agent identifiable only when the flux changes reproducibly).
+  - `ucst_ccif.audit_pipeline.run_audit` — stages S1 boundary / S2 factors / S3 conservation / S4 scale / S5 additionality / S6 leakage / S7 uncertainty, tolerant of missing ledgers (reported as data gaps, never silently estimated), emitting an 8-artifact `AuditReport`.
+  - `ucst_ccif.leakage.refit_without_leakage` — step 3 of the leakage protocol: drop leaky predictors and refit, quantifying the apparent gain (the Sapelo 36.1% signature).
+  - `ucst_ccif.models` — `M2aAgent` (M1 + exogenous agent-state feedback, Eq.2) and `m3_counterfactual` (military / restoration / DAC scenario engine, Eq.3).
 
-## What's new in v0.3.0
+## Install
 
-- **Four-ledger upload wizard (tab 0)**: upload the Activity, Flux, Stock and
-  Intervention ledgers as CSVs — column validation + downloadable templates.
-- **7-step audit pipeline (tab 10)**: `audit_pipeline.run_audit` runs S1
-  (boundary) → S2 (factors) → S3 (conservation, Eq.1) → S4 (scale, Eq.4-5) →
-  S5 (additionality, Eq.2-3) → S6 (leakage, Eq.7 + refit) → S7 (uncertainty),
-  and returns the **8 audit artifacts** plus an audit certificate.
-- **Attribution layer**: `conservation_reconcile` (Eq.1 residual), `attribution_split`
-  (Eq.2 agent test), `additionality_counterfactual` (Eq.3 active/passive).
-- **Leakage step 3**: `refit_without_leakage` — drop leaky predictors, refit,
-  quantify the *apparent* improvement (Sapelo honest baseline: 36.1%).
-- **M2a / M3 models**: `M2aAgent` (M1 + exogenous agent state) and
-  `m3_counterfactual` (military / restoration / DAC scenario parameters from
-  Sapelo Table 10).
-- **75/75 pytest suite** (previous: 43) covering attribution, audit pipeline,
-  leakage-free refit and M2a/M3.
-
-## The problem it solves
-
-A company says it emitted 500 t and removed 420 t by investing in a wetland,
-solar panels and a lawn. Who verifies that?
-
-OCIP answers with **conservation bookkeeping**:
-
-- **S1 boundary** — which emissions are in scope;
-- **S2 factors** — activity × emission factor library;
-- **S3 conservation (Eq.1)** — claimed removals vs independently observed
-  removals. The residual ε_C = observed − claimed. Negative ⇒ over-claiming.
-- **S4 scale (Eq.4-5)** — daily flux integral vs stock-ledger removals;
-- **S5 additionality (Eq.2-3)** — active trigger vs passive response;
-- **S6 leakage (Eq.7)** — 3-step screen: classify → correlate → no-leak refit;
-- **S7 uncertainty** — u95 budget for emissions and removals.
-
-Eight artifacts: verified emission interval, verified removal interval,
-conservation residual ε_C, scale residual, leakage RYG, attribution
-breakdown, uncertainty budget, and an **audit certificate** (PASS / REVIEW /
-FAIL / INCOMPLETE). Missing data is reported as a **data gap** — never
-silently estimated.
+```bash
+pip install -e ".[dev]"      # for development
+pip install -e ".[app]"       # for the Streamlit MVP
+pip install -e ".[data]"      # for NetCDF prior pulls (xarray + netCDF4)
+```
 
 ## Quick start
 
+```python
+from ucst_ccif import CarbonContinuumModel, ParameterSet, MonteCarloEnsemble
+import numpy as np
+
+T = 365
+gpp = np.clip(3.5 + 2.5*np.sin(2*np.pi*np.arange(T)/365), 0.2, 7.0)
+T_air = np.full(T, 20.0)
+swc = np.full(T, 0.55)
+rain = np.zeros(T)
+
+model = CarbonContinuumModel(ParameterSet())
+state = model.run(gpp, T_air, swc, rain)
+print(f"Annual NEE: {state.nee.mean()*365:.1f} gC m-2 yr-1")
+```
+
+## Streamlit MVP
+
 ```bash
-pip install -e .[dev,app]
 streamlit run app/streamlit_app.py
 ```
 
-Eleven tabs: **0. Upload 4 Ledgers**, 1. Scope 1, 2. Scope 2, 3. Scope 3,
-4. Biogenic flux, 5. Leakage audit, 6. NGFS scenarios, 7. Export PDF,
-8. Anthropogenic vs nature, 9. Data guide, **10. Audit Report**.
+Tabs (v0.3.0): **Upload 4 Ledgers** (activity / flux / stock / intervention CSVs with templates & column validation) · Scope 1–3 · Biogenic · **Leakage audit** · NGFS V5 · ISO 14064-3 PDF export · Anthropogenic · Data guide · **Audit Report** (runs the S1–S7 pipeline and shows the 8 artifacts: verified emission & removal intervals, ε_C residual, scale residual, leakage RYG flag, attribution decomposition, uncertainty budget, certificate).
 
-## Library API
+## How the audit works (S1–S7 → 8 artifacts)
 
-```python
-from ucst_ccif import run_audit, conservation_reconcile, refit_without_leakage
+Four ledgers in → a 7-step falsification pipeline → eight audited outputs plus a certificate.
 
-report = run_audit(
-    activity_df=...,        # columns: scope, category, activity_key, quantity
-    flux_df=...,            # columns: date, NEE_daily_total, ...
-    stock_df=...,           # columns: area_ha, removal_tco2e
-    intervention_df=...,    # columns: scenario, baseline_removal_tco2e, intervention_removal_tco2e
-    area_ha=100.0,
-    claimed_removals_tco2e=420.0,
-)
-print(report.certificate_status)      # e.g. "PASS — ledger consistent within tolerance"
-print(report.artifacts())             # the 8 audit artifacts
+```mermaid
+flowchart TB
+    classDef in fill:#e8f1f8,stroke:#2f6f9f,color:#123f5f;
+    classDef step fill:#ffffff,stroke:#5c6b7a,color:#2c3e50;
+    classDef out fill:#eaf6ec,stroke:#3a7d44,color:#1d4a26;
+
+    subgraph LEDG["📥 四账上传（Tab 0）"]
+        A["活动账 Activity<br/>scope · category · activity_key · quantity"]
+        F["通量账 Flux<br/>date · NEE_daily_total"]
+        S["碳库账 Stock<br/>area_ha · removal_tco2e"]
+        I["干预账 Intervention<br/>scenario · baseline · intervention"]
+    end
+
+    subgraph PIPE["⚙️ 7 步审计流水线 run_audit()"]
+        S1["S1 边界簿记<br/>活动 × 排放因子（Eq.8–10）"]
+        S2["S2 采集因子<br/>NEE = GPP − ER（Eq.6）"]
+        S3["S3 守恒核销<br/>ε_C = 独立观测 − 企业声称（Eq.1）"]
+        S4["S4 尺度核销<br/>跨尺度质量守恒（Eq.4–5）"]
+        S5["S5 归因额外性<br/>主动触发 F_a vs 被动响应 F_p（Eq.2–3）"]
+        S6["S6 泄漏审计<br/>三步：代数派生 → 泄漏版重拟合 → 去泄漏重拟合（Eq.7）"]
+        S7["S7 不确定性<br/>Monte Carlo · 90% CI"]
+    end
+
+    subgraph OUT["📤 8 件输出 + 审计证书"]
+        O1["① 边界清单"] O2["② 排放区间"] O3["③ 移除区间"] O4["④ 残差 ε_C"]
+        O5["⑤ 尺度残差"] O6["⑥ 泄漏 RYG 旗标"] O7["⑦ 归因分解"] O8["⑧ 不确定性预算"]
+        C["🏅 证书：PASS / REVIEW / FAIL / INCOMPLETE"]
+    end
+
+    A & F & S & I --> S1
+    S1 --> S2 --> S3 --> S4 --> S5 --> S6 --> S7
+    S7 --> O1 & O2 & O3 & O4 & O5 & O6 & O7 & O8
+    O1 & O2 & O3 & O4 & O5 & O6 & O7 & O8 --> C
+
+    class A,F,S,I in
+    class S1,S2,S3,S4,S5,S6,S7 step
+    class O1,O2,O3,O4,O5,O6,O7,O8,C out
 ```
 
-## Manuscript
+**Worked example** — a company books 420 tCO₂e removed but claims 600: S3 computes
+ε_C = independent observation − claimed = 420 − 600 = **−180 t** ⇒ certificate **FAIL — over-claim detected**.
+Negative ε_C always means the books claim more than the independent record supports.
 
-Methodology: **Liu, Y., & Cui, S. — Conservation-Constrained Integrated
-Framework (UCST-CCIF)** preprint, `ssrn-7417192` (30 pp).
+## Deploy it publicly (free)
 
-The framework links ecosystem flux observations (L1) to policy-scale carbon
-bookkeeping (L5) with one rule: **mass is conserved; every claim leaves a
-residual; every model is audited for leakage before its numbers are trusted.**
+Anyone with a link can use the app — no install needed on their side.
 
-## Roadmap
+1. **Streamlit Community Cloud** (easiest, free):
+   - Go to <https://share.streamlit.io> → **Sign in with GitHub**
+   - **Deploy an app** → pick `liulinda185-spec/Carbon-Falcon`
+   - Main file: `app/streamlit_app.py` → **Deploy**
+   - Result: a public URL like `https://carbon-falcon.streamlit.app`
+2. **Hugging Face Spaces** (alternative, free):
+   - Create a Space → SDK **Streamlit** → import the GitHub repo
+   - Main file `app/streamlit_app.py`; ensure `requirements.txt` lists
+     `streamlit`, `pandas`, `numpy`, `scipy`, `reportlab`.
+3. **Your own server** (most control): install `.[app]`, then
+   `streamlit run app/streamlit_app.py --server.port 80`.
 
-- [x] v0.3.0 — four-ledger upload, 7-step audit pipeline, leakage-free refit, M2a/M3
-- [ ] v0.4.0 — OCIP open network: shared factor library + community audits
-- [ ] v0.5.0 — API + third-party auditor onboarding
+## Tests
 
-## Citation / DOI
+```bash
+pytest tests/ -v
+```
 
-Zenodo DOI will be minted on the **v0.3.0** GitHub release. Steps:
+75 tests pass (v0.3.0), including the attribution, audit-pipeline, leakage-refit and M2a/M3 suites.
 
-1. Create the tag and release on GitHub (`v0.3.0`);
-2. In [zenodo.org](https://zenodo.org), authorise the
-   `liulinda185-spec/Carbon-Falcon` repository (once);
-3. Re-publish or refresh the release so Zenodo creates the DOI;
-4. Copy the DOI back here (`10.5281/zenodo.XXXXXXX`) and into the app's
-   `DOI_URL` (tab 10 / footer).
+## Zenodo DOI
 
-Apache-2.0 · Built by Liu Yingge (Linda) for the OCIP project.
+To mint a DOI for this release (v0.3.0):
+1. Tag and push: `git tag v0.3.0 && git push origin v0.3.0`
+2. Go to [zenodo.org](https://zenodo.org), sign in with GitHub.
+3. Enable the `liulinda185-spec/Carbon-Falcon` repository in Zenodo (one-time grant).
+4. Publish a new GitHub release for tag `v0.3.0` — Zenodo archives it and mints the DOI.
+5. Backfill the DOI into `pyproject.toml` and this README.
+
+## Citation
+
+Liu, Y. & Cui, W. (2026). *Integrating Ecological Carbon Fluxes Across Scales: A Conservation-Constrained, Falsification-Based Modelling Framework based on Unified Complex System Theory (UCST)*. Ecological Modelling.
+
+## License
+
+Apache License 2.0 — see [LICENSE](LICENSE). Part of the UCST-CCIF Open Carbon Platform (OCIP) project, GBA-first.
