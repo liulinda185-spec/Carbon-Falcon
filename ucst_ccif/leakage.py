@@ -111,3 +111,89 @@ def split_predictors(report: LeakageReport) -> tuple[list[str], list[str]]:
     leaky = [c for c, cls in report.classified.items() if cls == "leaky"]
     exogenous = [c for c, cls in report.classified.items() if cls == "exogenous"]
     return leaky, exogenous
+
+
+# --------------------------------------------------------------------------
+# Step 3: leakage-free refit (the honest-baseline comparison)
+# --------------------------------------------------------------------------
+@dataclass
+class RefitReport:
+    """Comparison of the model with leaky predictors vs the leakage-free refit."""
+    leaky_rmse: float          # out-of-sample RMSE using ALL predictors
+    clean_rmse: float          # out-of-sample RMSE using exogenous predictors only
+    apparent_gain_pct: float   # (1 - leaky/clean)*100; positive = leaky looks better
+    leaky_predictors: list[str]
+    clean_predictors: list[str]
+    n_samples: int
+    test_fraction: float
+
+    def summary(self) -> str:
+        return (
+            f"=== Leakage-free refit (step 3) ===\n"
+            f"RMSE with leaky predictors : {self.leaky_rmse:.4f}\n"
+            f"RMSE leakage-free refit    : {self.clean_rmse:.4f}\n"
+            f"Apparent gain from leakage : {self.apparent_gain_pct:+.1f}%\n"
+            f"(positive = the leaky model only *looks* better; "
+            f"Sapelo honest baseline: 36.1% apparent gain)\n"
+            f"Clean predictors retained : {self.clean_predictors}"
+        )
+
+
+def _ols_rmse(df: pd.DataFrame, target: str, cols: list[str],
+              test_fraction: float) -> tuple[float, int]:
+    """Linear OLS (with intercept), time-ordered train/test split."""
+    data = df.dropna(subset=[target] + cols).copy()
+    n = len(data)
+    n_test = max(5, int(n * test_fraction))
+    n_train = n - n_test
+    if n_train < 10 or n_test < 2:
+        raise ValueError(
+            f"not enough rows for refit: {n} rows "
+            f"(need >= 12 with {test_fraction:.0%} test split)")
+    X = np.column_stack([data[c].values for c in cols])
+    X = np.column_stack([X, np.ones(n)])
+    y = data[target].values
+    X_tr, X_te, y_tr, y_te = X[:n_train], X[n_train:], y[:n_train], y[n_train:]
+    beta, *_ = np.linalg.lstsq(X_tr, y_tr, rcond=None)
+    pred = X_te @ beta
+    rmse = float(np.sqrt(np.mean((pred - y_te) ** 2)))
+    return rmse, n
+
+
+def refit_without_leakage(
+    df: pd.DataFrame,
+    target_col: str,
+    predictor_cols: Sequence[str],
+    exo_only: Sequence[str] | None = None,
+    test_fraction: float = 0.25,
+) -> RefitReport:
+    """
+    Step 3 of the leakage protocol: drop the leaky predictors, refit the model,
+    and compare out-of-sample RMSE. A large apparent gain (clean RMSE above
+    leaky RMSE) is the signature of target leakage — the quoted R2/RMSE was
+    partly explaining the target with itself.
+
+    `exo_only` overrides the automatic classification (use it when the
+    name-based heuristic needs a manual correction).
+    """
+    leaky_cols = [c for c in predictor_cols if classify_predictor(c) == "leaky"]
+    if exo_only is not None:
+        clean_cols = [c for c in exo_only if c in df.columns]
+    else:
+        clean_cols = [c for c in predictor_cols if c not in leaky_cols]
+    if not clean_cols:
+        return RefitReport(
+            leaky_rmse=float("nan"), clean_rmse=float("nan"),
+            apparent_gain_pct=float("nan"),
+            leaky_predictors=leaky_cols, clean_predictors=[],
+            n_samples=0, test_fraction=test_fraction)
+
+    leaky_rmse, n1 = _ols_rmse(df, target_col, list(predictor_cols), test_fraction)
+    clean_rmse, n2 = _ols_rmse(df, target_col, clean_cols, test_fraction)
+    apparent_gain = (1.0 - leaky_rmse / clean_rmse) * 100.0 \
+        if clean_rmse > 0 else float("nan")
+    return RefitReport(
+        leaky_rmse=leaky_rmse, clean_rmse=clean_rmse,
+        apparent_gain_pct=apparent_gain,
+        leaky_predictors=leaky_cols, clean_predictors=clean_cols,
+        n_samples=min(n1, n2), test_fraction=test_fraction)
