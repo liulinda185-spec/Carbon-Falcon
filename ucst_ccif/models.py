@@ -171,3 +171,148 @@ def compare_m0_m1(df: pd.DataFrame, target: str,
                    np.array(m1_init), (np.array(m1_lo), np.array(m1_hi)))
 
     return {"M0": r0, "M1": r1}
+
+
+class M2aAgent(M1Conservation):
+    """
+    M2a: M1 + exogenous agent-state feedback Omega(t).
+
+    The agent state is an external management signal (e.g. intervention
+    intensity, water management, species-mix change) built WITHOUT any
+    GPP/ER terms — it stays leakage-free by construction. Added complexity
+    is only justified if it survives the out-of-sample test vs M1.
+    """
+    name = "M2a"
+
+    def __init__(self, exo_cols: list[str],
+                 disturbance_col: str = "disturbance",
+                 agent_col: str = "agent_state"):
+        super().__init__(exo_cols, disturbance_col)
+        self.agent_col = agent_col
+        self.n_params = 7 + self.n_exo + 1 + 2 + 2  # + c_Omega, c_dOmega
+
+    def predict(self, params: np.ndarray, df: pd.DataFrame) -> np.ndarray:
+        base = super().predict(params[: 7 + self.n_exo + 1 + 2], df)
+        c_om = params[7 + self.n_exo + 1 + 2]
+        c_dom = params[7 + self.n_exo + 1 + 3]
+        return (base + c_om * df[self.agent_col].values
+                + c_dom * df["d" + self.agent_col].values)
+
+
+def compute_agent_state(df: pd.DataFrame, agent_col: str) -> pd.DataFrame:
+    """
+    Build a leakage-free agent state (z-scored anomaly, cumulative, detrended)
+    from an exogenous management signal, mirroring compute_conservation_state.
+    """
+    df = df.copy()
+    seasonal = df.groupby("month")[agent_col].transform("mean")
+    anom = df[agent_col] - seasonal
+    std = anom.std()
+    df[agent_col] = anom / std if std > 0 else 0.0
+    cum = np.cumsum(df[agent_col].values)
+    df[agent_col] = detrend(cum)
+    df["d" + agent_col] = np.diff(df[agent_col], prepend=df[agent_col].iloc[0])
+    return df
+
+
+def compare_m0_m1_m2a(df: pd.DataFrame, target: str,
+                      exo_cols: list[str], agent_col: str,
+                      calib_end_year: int = 2020,
+                      disturbance_col: str = "disturbance") -> dict[str, ModelResult]:
+    """
+    M0 vs M1_exo vs M2a on the same calibration/validation split.
+
+    The M2a gain over M1 (agent R2 gain) answers Eq. 2: does an exogenous
+    management state move the flux AFTER conservation is accounted for?
+    """
+    res = compare_m0_m1(df, target, exo_cols, calib_end_year, disturbance_col)
+    df = df.copy()
+    df["date"] = pd.to_datetime(df["date"])
+    df["doy"] = df["date"].dt.dayofyear
+    df["month"] = df["date"].dt.month
+    df["year"] = df["date"].dt.year
+    df = df.dropna(subset=[target] + list(exo_cols) + [disturbance_col, agent_col])
+    df = compute_conservation_state(df, exo_cols)
+    df = compute_agent_state(df, agent_col)
+
+    calib = df[df["year"] <= calib_end_year].copy()
+    valid = df[df["year"] > calib_end_year].copy()
+    n_exo = len(exo_cols)
+
+    m0_lo = [-3, -3, -3, -2, -2, -1, -1] + [-5]*n_exo + [-3]
+    m0_hi = [3, 3, 3, 2, 2, 1, 1] + [5]*n_exo + [3]
+    m1_lo = m0_lo + [-0.01, -5]
+    m1_hi = m0_hi + [0.01, 5]
+    m2_lo = m1_lo + [-0.01, -5]
+    m2_hi = m1_hi + [0.01, 5]
+
+    m2_init = list(res["M1"].params) + [0.001, 0.1]
+    m2 = M2aAgent(exo_cols, disturbance_col, agent_col)
+    r2 = fit_model(m2, calib, valid, target,
+                   np.array(m2_init),
+                   (np.array(m2_lo, dtype=float), np.array(m2_hi, dtype=float)))
+    res["M2a"] = r2
+    return res
+
+
+# --------------------------------------------------------------------------
+# M3: counterfactual human-agency scenarios (Eq. 3, post-calibration)
+# --------------------------------------------------------------------------
+# Illustrative scenario parameters (Sapelo Island, manuscript Table 10).
+# F_a = active trigger of human action; F_p = passive ecosystem response.
+# Units: gC m-2 d-1 of NEE change per unit intervention. NOT forecasts —
+# they are audit scenario defaults the user can override.
+SCENARIO_PARAMS: dict[str, dict[str, float]] = {
+    # e.g. military hard-engineered land use: net emission pressure
+    "military":    {"F_a": +0.956, "F_p": +0.327},
+    # restoration planting: active uptake + passive regrowth follows
+    "restoration": {"F_a": -0.105, "F_p": -0.277},
+    # DAC / engineered removal: purely exogenous, no passive term
+    "dac":         {"F_a": -0.274, "F_p": 0.000},
+}
+
+# tCO2e per ha per year for 1 gC m-2 d-1 of sustained NEE change.
+_GCM2D_TO_TCO2E_HA_YR = 365.0 * 1e4 * 44.0 / 12.0 / 1e6  # = 13.383
+
+
+def m3_counterfactual(baseline_nee_gCm2_d: float,
+                      scenario: str = "restoration",
+                      area_ha: float | None = None,
+                      F_a: float | None = None,
+                      F_p: float | None = None) -> dict:
+    """
+    Counterfactual agency test (Eq. 3): split an intervention into active
+    trigger (F_a) and passive response (F_p), and report the extra removal
+    against the no-action baseline.
+
+    Returns a dict with delta-NEE, extra removal (tCO2e), the active/passive
+    decomposition and an additionality ratio. `F_a`/`F_p` override the
+    illustrative defaults; `area_ha` switches output to total tCO2e/yr.
+    """
+    if scenario not in SCENARIO_PARAMS and (F_a is None or F_p is None):
+        raise ValueError(
+            f"unknown scenario {scenario!r}; known: {sorted(SCENARIO_PARAMS)} "
+            f"or pass F_a/F_p explicitly")
+    fa = float(F_a) if F_a is not None else SCENARIO_PARAMS[scenario]["F_a"]
+    fp = float(F_p) if F_p is not None else SCENARIO_PARAMS[scenario]["F_p"]
+
+    delta_nee = fa + fp                       # gC m-2 d-1 (negative = more uptake)
+    per_ha = -delta_nee * _GCM2D_TO_TCO2E_HA_YR  # tCO2e/ha/yr extra removal
+    total = per_ha * area_ha if area_ha else None
+    denom = fa + fp
+    active_share = fa / denom if denom != 0 else float("nan")
+
+    out = {
+        "scenario": scenario,
+        "baseline_nee_gCm2_d": float(baseline_nee_gCm2_d),
+        "delta_nee_gCm2_d": delta_nee,
+        "F_a_active_trigger": fa,
+        "F_p_passive_response": fp,
+        "extra_removal_tco2e_ha_yr": per_ha,
+        "active_share_of_change": active_share,
+        "illustrative_note": "scenario defaults from Sapelo Table 10; "
+                             "override F_a/F_p with site data",
+    }
+    if total is not None:
+        out["extra_removal_tco2e_yr"] = total
+    return out
