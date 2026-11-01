@@ -53,7 +53,18 @@ print(f"Annual NEE: {state.nee.mean()*365:.1f} gC m-2 yr-1")
 streamlit run app/streamlit_app.py
 ```
 
-Tabs (v0.3.0): **Upload 4 Ledgers** (activity / flux / stock / intervention CSVs with templates & column validation) · Scope 1–3 · Biogenic · **Leakage audit** · NGFS V5 · ISO 14064-3 PDF export · Anthropogenic · Data guide · **Audit Report** (runs the S1–S7 pipeline and shows the 8 artifacts: verified emission & removal intervals, ε_C residual, scale residual, leakage RYG flag, attribution decomposition, uncertainty budget, certificate).
+Workspaces (v0.3.0, reorganized): **① Upload & Dictionary** — the four ledgers
+(activity / flux / stock / intervention) with CSV templates that carry `#` comment
+lines (full names + units), per-ledger column dictionaries, and area input;
+**② Audit Report** — runs the S1–S7 pipeline and shows the 8 artifacts (verified
+emission & removal intervals, ε_C residual, scale residual, leakage RYG flag +
+flagged predictors, attribution decomposition, uncertainty budget, certificate)
+plus a PDF evidence pack; **③ Benchmarks** — official reference data (CEADs
+Guangdong, Global Carbon Budget, HK EPD, CH₄ kernels, CCER mangrove screening)
+and an NGFS stress lens. The old manual Scope 1–3 / Biogenic / standalone
+Leakage / PDF tabs were removed: the four-ledger upload already covers them
+(Scope 1–3 via the activity ledger in S1, biogenic flux via the flux ledger in
+S2, leakage in S6, PDF export post-audit).
 
 ## How the audit works (S1–S7 → 8 artifacts)
 
@@ -65,7 +76,7 @@ flowchart TB
     classDef step fill:#ffffff,stroke:#5c6b7a,color:#2c3e50;
     classDef out fill:#eaf6ec,stroke:#3a7d44,color:#1d4a26;
 
-    subgraph LEDG["📥 四账上传（Tab 0）"]
+    subgraph LEDG["📥 四账上传（工作区 1 · Upload & Dictionary）"]
         A["活动账 Activity<br/>scope · category · activity_key · quantity"]
         F["通量账 Flux<br/>date · NEE_daily_total"]
         S["碳库账 Stock<br/>area_ha · removal_tco2e"]
