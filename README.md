@@ -1,92 +1,107 @@
-# UCST-CCIF
+# OCIP — Open Carbon Platform (Carbon Falcon)
 
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.XXXXXXX.svg)](https://doi.org/10.5281/zenodo.XXXXXXX) <!-- Replace XXXX with your minted DOI after publishing the release (Zenodo auto-mints it) -->
+[![Version](https://img.shields.io/badge/version-v0.3.0-blue)]()
+[![Tests](https://img.shields.io/badge/tests-75%2F75-green)]()
+[![License](https://img.shields.io/badge/license-Apache--2.0-gold)]()
 
-**Conservation-Constrained Carbon Flux Integrated Framework** — auditable, cross-scale carbon accounting from enterprise Scope 1 to coastal blue carbon.
+**OCIP (Open Carbon Platform)** is the independent carbon-verification layer for
+GBA enterprises, auditors and research teams, built on the **UCST-CCIF**
+(Conservation-Constrained Carbon Flux Integrated Framework) engine.
 
-## What it does
+> The audit is the product — not the number.
 
-- **Continuum model** (`ucst_ccif.compartments`): 12-pool daily land–river–coastal carbon model with Q10 temperature response, moisture constraints, and a mass-balance residual ε_C that flags bookkeeping gaps.
-- **Leakage audit** (`ucst_ccif.leakage`): three-step detector that flags predictors algebraically derived from NEE (GPP, ER, cumulative balance) before they fake model performance.
-- **Nested M0–M3 comparison** (`ucst_ccif.models`): scipy-optimized models where each added layer must justify itself out-of-sample.
-- **Monte Carlo uncertainty** (`ucst_ccif.uncertainty`): parameter ensemble with 90% confidence intervals.
-- **MVP integration kernels (v0.2.1)**:
-  - `rothc_lite` — RothC 4-pool soil-C kernel (monthly, date-stamped inputs)
-  - `bluecarbon_lookups` — InVEST-style mangrove/saltmarsh/seagrass stocks, burial, CH4
-  - `dndc_lite` — rice CH4 Tier-1 (IPCC scaling factors, water-regime management table)
-  - `landfill` — landfill CH4 Tier-1 kernel (IPCC 2006/2019: MSW × DOC × DOC_F × F × (1−OX) × MCF; 5 landfill management types; AR5/AR6 GWP display)
-  - `threepg_lookups` — GBA subtropical species parameters + light NPP scoping
-  - `raymond_evasion` — inland-water CO2 evasion (gas-transfer, Raymond-2013)
-  - `netcdf_priors` — read-only prior registry/client for CAMS, FLUXCOM, SoilGrids, NASA CMS mangrove, SOCAT, CEADs
-- **CLI**: `ucst-ccif run | audit | compare | rothc | blue | rice | evasion | priors | version`.
+## What's new in v0.3.0
 
-## Install
+- **Four-ledger upload wizard (tab 0)**: upload the Activity, Flux, Stock and
+  Intervention ledgers as CSVs — column validation + downloadable templates.
+- **7-step audit pipeline (tab 10)**: `audit_pipeline.run_audit` runs S1
+  (boundary) → S2 (factors) → S3 (conservation, Eq.1) → S4 (scale, Eq.4-5) →
+  S5 (additionality, Eq.2-3) → S6 (leakage, Eq.7 + refit) → S7 (uncertainty),
+  and returns the **8 audit artifacts** plus an audit certificate.
+- **Attribution layer**: `conservation_reconcile` (Eq.1 residual), `attribution_split`
+  (Eq.2 agent test), `additionality_counterfactual` (Eq.3 active/passive).
+- **Leakage step 3**: `refit_without_leakage` — drop leaky predictors, refit,
+  quantify the *apparent* improvement (Sapelo honest baseline: 36.1%).
+- **M2a / M3 models**: `M2aAgent` (M1 + exogenous agent state) and
+  `m3_counterfactual` (military / restoration / DAC scenario parameters from
+  Sapelo Table 10).
+- **75/75 pytest suite** (previous: 43) covering attribution, audit pipeline,
+  leakage-free refit and M2a/M3.
 
-```bash
-pip install -e ".[dev]"      # for development
-pip install -e ".[app]"       # for the Streamlit MVP
-pip install -e ".[data]"      # for NetCDF prior pulls (xarray + netCDF4)
-```
+## The problem it solves
+
+A company says it emitted 500 t and removed 420 t by investing in a wetland,
+solar panels and a lawn. Who verifies that?
+
+OCIP answers with **conservation bookkeeping**:
+
+- **S1 boundary** — which emissions are in scope;
+- **S2 factors** — activity × emission factor library;
+- **S3 conservation (Eq.1)** — claimed removals vs independently observed
+  removals. The residual ε_C = observed − claimed. Negative ⇒ over-claiming.
+- **S4 scale (Eq.4-5)** — daily flux integral vs stock-ledger removals;
+- **S5 additionality (Eq.2-3)** — active trigger vs passive response;
+- **S6 leakage (Eq.7)** — 3-step screen: classify → correlate → no-leak refit;
+- **S7 uncertainty** — u95 budget for emissions and removals.
+
+Eight artifacts: verified emission interval, verified removal interval,
+conservation residual ε_C, scale residual, leakage RYG, attribution
+breakdown, uncertainty budget, and an **audit certificate** (PASS / REVIEW /
+FAIL / INCOMPLETE). Missing data is reported as a **data gap** — never
+silently estimated.
 
 ## Quick start
 
-```python
-from ucst_ccif import CarbonContinuumModel, ParameterSet, MonteCarloEnsemble
-import numpy as np
-
-T = 365
-gpp = np.clip(3.5 + 2.5*np.sin(2*np.pi*np.arange(T)/365), 0.2, 7.0)
-T_air = np.full(T, 20.0)
-swc = np.full(T, 0.55)
-rain = np.zeros(T)
-
-model = CarbonContinuumModel(ParameterSet())
-state = model.run(gpp, T_air, swc, rain)
-print(f"Annual NEE: {state.nee.mean()*365:.1f} gC m-2 yr-1")
-```
-
-## Streamlit MVP
-
 ```bash
+pip install -e .[dev,app]
 streamlit run app/streamlit_app.py
 ```
 
-Nine tabs: **Scope 1/2/3** enterprise inventory (MEE factors, Guangdong grid), **Biogenic** GBA wetland flux demo, **Leakage** audit, **NGFS V5** scenarios, **ISO 14064-3 PDF** export, **Anthropogenic ledger** (HK EPD 2023 sectors, Guangdong CEADs 2022, Global Carbon Budget 2025, CH4 by sector — rice + landfill, CCER mangrove restoration lookup, anthropogenic-vs-nature balance sheet), and a **Data guide** (free data-source map, CSV upload setup, LEAKY pattern guide, unit conversions, end-to-end worked example).
+Eleven tabs: **0. Upload 4 Ledgers**, 1. Scope 1, 2. Scope 2, 3. Scope 3,
+4. Biogenic flux, 5. Leakage audit, 6. NGFS scenarios, 7. Export PDF,
+8. Anthropogenic vs nature, 9. Data guide, **10. Audit Report**.
 
-## Tests
+## Library API
 
-```bash
-pytest tests/ -v
+```python
+from ucst_ccif import run_audit, conservation_reconcile, refit_without_leakage
+
+report = run_audit(
+    activity_df=...,        # columns: scope, category, activity_key, quantity
+    flux_df=...,            # columns: date, NEE_daily_total, ...
+    stock_df=...,           # columns: area_ha, removal_tco2e
+    intervention_df=...,    # columns: scenario, baseline_removal_tco2e, intervention_removal_tco2e
+    area_ha=100.0,
+    claimed_removals_tco2e=420.0,
+)
+print(report.certificate_status)      # e.g. "PASS — ledger consistent within tolerance"
+print(report.artifacts())             # the 8 audit artifacts
 ```
 
-## Roadmap — ML/AI as the next step
+## Manuscript
 
-The current release is a **process-based + statistical** toolkit (no ML training): the continuum model, scipy-optimised M0–M3 comparison, Monte Carlo sampling and the correlation-based leakage audit are all white-box by design. The next development phase adds machine learning in **thin, auditable layers only** — ML never replaces the core ledger, the leakage audit, or the conservation residual ε_C:
+Methodology: **Liu, Y., & Cui, S. — Conservation-Constrained Integrated
+Framework (UCST-CCIF)** preprint, `ssrn-7417192` (30 pp).
 
-| Priority | Capability | What it adds | Why it fits OCIP |
-|---|---|---|---|
-| **P1** | ML emulator priors (LPJ-GUESS RF/NN emulator, GMD 2025) | Cheap, reproducible GPP/NEE baseline grids as M0 priors | Replaces costly full-DGVM runs while keeping the prior pipeline read-only and testable |
-| **P2** | Conformal prediction (e.g. MAPIE) | Honest prediction intervals around all M0–M3 outputs | Strengthens the falsification narrative and makes MRV uncertainty claims defensible |
-| **P3** | Double ML / causal forests | M3 counterfactual attribution and CCER/CRCF additionality | Directly matches Article 6.4 baseline-and-additionality requirements |
-| **P4** | Geospatial foundation models (e.g. Prithvi-EO-2.0, fine-tuned on FLUXNET) + deep ensembles | Up-scaled GPP priors and covariate-drift detection | Provides operational GPP priors for GBA; drift alarms flag model degradation before it misleads clients |
+The framework links ecosystem flux observations (L1) to policy-scale carbon
+bookkeeping (L5) with one rule: **mass is conserved; every claim leaves a
+residual; every model is audited for leakage before its numbers are trusted.**
 
-**Implementation contract for the ML phase:**
-- Ship as an optional `ucst_ccif.ml` module with its own test suite; keep core dependencies lean (e.g. scikit-learn + MAPIE as extras).
-- Every ML feature must pass the leakage audit before acceptance — a predictor that is algebraically derived from the target is rejected by construction.
-- Validate site-to-site at GBA before any client-facing use; never adopt a foundation-model output without a local benchmark.
+## Roadmap
 
-## Zenodo DOI
+- [x] v0.3.0 — four-ledger upload, 7-step audit pipeline, leakage-free refit, M2a/M3
+- [ ] v0.4.0 — OCIP open network: shared factor library + community audits
+- [ ] v0.5.0 — API + third-party auditor onboarding
 
-This repository is linked to Zenodo. To mint a DOI:
-1. Publish a GitHub release from a tag (e.g. `v0.2.1`) — Zenodo archives it automatically.
-2. Zenodo creates a record and mints a DOI (`10.5281/zenodo.XXXXXXXX`).
-3. Paste the DOI into the badge at the top of this README and into the Citation section below.
-4. Add the DOI to `pyproject.toml` (in `[project.urls]`) if desired.
+## Citation / DOI
 
-## Citation
+Zenodo DOI will be minted on the **v0.3.0** GitHub release. Steps:
 
-Liu, Y. & Cui, W. (2026). *Integrating Ecological Carbon Fluxes Across Scales: A Conservation-Constrained, Falsification-Based Modelling Framework based on Unified Complex System Theory (UCST)*. Ecological Modelling. DOI: `10.5281/zenodo.XXXXXXX` *(minted via Zenodo GitHub integration; update after first release)*.
+1. Create the tag and release on GitHub (`v0.3.0`);
+2. In [zenodo.org](https://zenodo.org), authorise the
+   `liulinda185-spec/Carbon-Falcon` repository (once);
+3. Re-publish or refresh the release so Zenodo creates the DOI;
+4. Copy the DOI back here (`10.5281/zenodo.XXXXXXX`) and into the app's
+   `DOI_URL` (tab 10 / footer).
 
-## License
-
-Apache License 2.0 — see [LICENSE](LICENSE). Part of the UCST-CCIF Open Carbon Platform (OCIP) project, GBA-first.
+Apache-2.0 · Built by Liu Yingge (Linda) for the OCIP project.

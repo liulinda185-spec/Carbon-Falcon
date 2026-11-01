@@ -1,5 +1,5 @@
 """
-UCST-CCIF Streamlit MVP — v0.2
+UCST-CCIF Streamlit MVP — v0.3 (UI refresh, same engines)
 
 Tabs:
   1. Scope 1 stationary combustion (MEE factors)
@@ -20,8 +20,8 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
-st.set_page_config(page_title="UCST-CCIF Carbon Calculator", layout="wide",
-                   initial_sidebar_state="expanded")
+st.set_page_config(page_title="OCIP — Carbon Verification Layer", layout="wide",
+                   initial_sidebar_state="expanded", page_icon="🛰️")
 
 from ucst_ccif.emission_factors import (
     FUELS, GRID_FACTORS_MEE_2022, GRID_SOURCE,
@@ -29,82 +29,244 @@ from ucst_ccif.emission_factors import (
 )
 
 # ------------------------------------------------------------------
-st.sidebar.title("UCST-CCIF")
-st.sidebar.caption("Conservation-constrained carbon accounting")
-region = st.sidebar.selectbox("Grid region",
-    ["guangdong", "south_region", "national_avg"], index=0)
-grid_factor = GRID_FACTORS_MEE_2022[region]
-st.sidebar.info(f"Grid EF: {grid_factor:.4f} kgCO2/kWh\n({GRID_SOURCE})")
+# Brand & theme
+APP_VERSION = "v0.3.0"
+APP_TAGLINE = "The independent carbon-verification layer for GBA enterprises & research teams"
+GITHUB_URL = "https://github.com/liulinda185-spec/Carbon-Falcon"
+DOI_URL = "https://zenodo.org/records/23687344"
 
-tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs([
-    "1. Scope 1", "2. Scope 2", "3. Scope 3",
-    "4. Biogenic", "5. Leakage", "6. NGFS", "7. Export PDF",
-    "8. Anthropogenic", "9. Data Guide"
+st.markdown("""
+<style>
+  /* Hero */
+  .ocip-hero { padding: .35rem .9rem .5rem .9rem; border-left: 5px solid #1F497D;
+               background: linear-gradient(90deg, #FFFFFF 0%, #F2F5F9 100%);
+               border-radius: 10px; margin-bottom: .4rem; }
+  .ocip-hero h1 { margin: 0; font-size: 2.0rem; letter-spacing: -.01em;
+                  color: #1F497D; }
+  .ocip-hero .tagline { color: #47596B; font-size: 1.02rem; margin-top: .1rem; }
+  .ocip-hero .badges { margin-top: .3rem; }
+  .ocip-badge { display: inline-block; background: #1F497D; color: #fff;
+                border-radius: 20px; padding: .1rem .7rem; font-size: .78rem;
+                margin-right: .4rem; font-weight: 600; }
+  .ocip-badge.gold { background: #C9A227; }
+  .ocip-badge.grey { background: #5C6B7A; }
+  /* Cards */
+  .ocip-card { background: #FFFFFF; border: 1px solid #E3E8EE; border-radius: 10px;
+               padding: .9rem 1.1rem; margin: .3rem 0 .7rem 0;
+               box-shadow: 0 1px 2px rgba(31,73,125,.05); }
+  .ocip-card h4 { color: #1F497D; margin: 0 0 .35rem 0; font-size: 1.0rem; }
+  .ocip-card .src { color: #8A97A5; font-size: .8rem; }
+  /* Section labels */
+  .ocip-section { color: #1F497D; font-weight: 700; font-size: .95rem;
+                  letter-spacing: .04em; margin: .2rem 0 .15rem 0; }
+  /* Metrics polish */
+  [data-testid="stMetric"] { background: #FFFFFF; border: 1px solid #E3E8EE;
+                             border-radius: 10px; padding: .6rem .8rem; }
+  [data-testid="stMetricLabel"] { color: #5C6B7A; }
+  /* Footer */
+  .ocip-footer { color: #8A97A5; font-size: .8rem; margin-top: 1.2rem;
+                 border-top: 1px solid #E3E8EE; padding-top: .5rem; }
+  /* Sidebar brand */
+  .ocip-side-brand { font-size: 1.15rem; font-weight: 800; color: #1F497D; }
+  .ocip-side-sub { color: #5C6B7A; font-size: .82rem; }
+</style>
+""", unsafe_allow_html=True)
+
+st.markdown(f"""
+<div class="ocip-hero">
+  <h1>🛰️ OCIP — Open Carbon Platform</h1>
+  <div class="tagline">{APP_TAGLINE}</div>
+  <div class="badges">
+    <span class="ocip-badge">{APP_VERSION}</span>
+    <span class="ocip-badge">75/75 tests</span>
+    <span class="ocip-badge gold">Apache-2.0</span>
+    <span class="ocip-badge grey">UCST-CCIF engine</span>
+  </div>
+</div>
+""", unsafe_allow_html=True)
+st.caption("One auditable ledger: fossil + biogenic flux · leakage audit built in · "
+           "L1 point flux → L5 policy · same factors, same ε_C residual rule at every scale.")
+
+# ------------------------------------------------------------------
+# Sidebar
+with st.sidebar:
+    st.markdown('<div class="ocip-side-brand">OCIP</div>', unsafe_allow_html=True)
+    st.markdown('<div class="ocip-side-sub">Carbon verification · UCST-CCIF</div>',
+                unsafe_allow_html=True)
+    st.divider()
+    region = st.selectbox("Grid region",
+        ["guangdong", "south_region", "national_avg"], index=0,
+        help="Grid emission factor used across Scope 2, balance sheet and examples.")
+    grid_factor = GRID_FACTORS_MEE_2022[region]
+    st.info(f"Grid EF: {grid_factor:.4f} kgCO2/kWh\n({GRID_SOURCE})")
+    st.divider()
+    st.caption("**How to use** — start at Scope 1–3 (your activity data), then "
+               "Biogenic & Leakage for the natural side and model checks, then "
+               "Export PDF for an audit-ready trail. Tab 9 explains every input.")
+    st.caption(f"[GitHub]({GITHUB_URL}) · [Zenodo DOI]({DOI_URL}) · v{APP_VERSION.lstrip('v')}")
+
+tab_upload, tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab_report = st.tabs([
+    "📥 0. Upload 4 Ledgers", "⚡ 1. Scope 1", "🔌 2. Scope 2", "🔗 3. Scope 3",
+    "🌿 4. Biogenic", "🛡️ 5. Leakage", "🧭 6. NGFS", "📤 7. Export PDF",
+    "🏭 8. Anthropogenic", "📚 9. Data Guide", "🧾 10. Audit Report"
 ])
+
+# ========== 0. UPLOAD FOUR LEDGERS ==========
+with tab_upload:
+    st.header("Upload the four ledgers")
+    st.caption("The 7-step audit pipeline (tab 10) reads exactly these four "
+               "ledgers. Every file is optional — missing ones become reported "
+               "data gaps, never silent estimates.")
+
+    # ---- CSV templates ----
+    tmpl = {
+        "activity": ("scope,category,activity_key,quantity\n"
+                     "2,electricity,guangdong,1135589.4\n"
+                     "1,fuel,diesel_L,20000\n"
+                     "2,purchased_goods,manufactured_goods,2000000\n"),
+        "flux": ("date,NEE_daily_total,GPP_daily_total,ER_daily_total,"
+                 "wind_speed_mean,temperature_2m_mean\n"
+                 "2023-01-01,3.92,2.27,1.29,14.7,14.0\n"
+                 "2023-01-02,4.47,1.90,1.14,20.2,15.3\n"),
+        "stock": ("area_ha,removal_tco2e\n"
+                  "100.0,420.0\n"),
+        "intervention": ("scenario,baseline_removal_tco2e,"
+                         "intervention_removal_tco2e,active_fraction\n"
+                         "wetland_restoration,300.0,420.0,0.4\n"),
+    }
+    t1, t2, t3, t4 = st.columns(4)
+    for col, key, label in ((t1, "activity", "Activity ledger"),
+                            (t2, "flux", "Flux ledger"),
+                            (t3, "stock", "Stock ledger"),
+                            (t4, "intervention", "Intervention ledger")):
+        with col:
+            st.download_button(
+                f"⬇ {label} template (CSV)", data=tmpl[key],
+                file_name=f"ocip_{key}_template.csv", mime="text/csv")
+
+    st.divider()
+    c_a, c_f, c_s, c_i = st.columns(4)
+    required = {
+        "activity": ["scope", "category", "activity_key", "quantity"],
+        "flux": ["date", "NEE_daily_total"],
+        "stock": ["area_ha", "removal_tco2e"],
+        "intervention": ["scenario", "baseline_removal_tco2e",
+                         "intervention_removal_tco2e"],
+    }
+    ledgers = {
+        "activity": ("ocip_activity", "Activity ledger (Scope 1-3)"),
+        "flux": ("ocip_flux", "Flux ledger (daily NEE)"),
+        "stock": ("ocip_stock", "Stock ledger (observed removal)"),
+        "intervention": ("ocip_intervention", "Intervention ledger (Eq.3)"),
+    }
+    for col, (key, (skey, label)) in zip((c_a, c_f, c_s, c_i), ledgers.items()):
+        with col:
+            st.markdown(f"**{label}**")
+            up = st.file_uploader(f"Upload {key}", type=["csv"],
+                                  key=f"up_{key}")
+            if up:
+                try:
+                    df = pd.read_csv(up)
+                    st.session_state[skey] = df
+                    miss = [c for c in required[key] if c not in df.columns]
+                    st.dataframe(df.head(3), width="stretch")
+                    if miss:
+                        st.error(f"Missing columns: {', '.join(miss)}")
+                    else:
+                        st.success(f"OK — {len(df)} rows, required columns present")
+                except Exception as e:  # noqa: BLE001
+                    st.error(f"Could not parse CSV: {e}")
+                    st.session_state.pop(skey, None)
+
+    area_ha = st.number_input(
+        "Project area (ha) — used to convert daily NEE (gC/m²/d) into tCO₂e",
+        0.0, 1e9, 100.0, step=1.0, key="ocip_area_input")
+    st.session_state["ocip_area"] = area_ha
+    st.caption("Run the pipeline from **tab 10 (Audit Report)** once at least "
+               "the activity ledger and one removal observation are in.")
 
 # ========== SCOPE 1 ==========
 with tab1:
     st.header("Scope 1 — stationary combustion")
-    st.write("Enter fuel use. Factors from MEE power-generation guideline App.A.")
-    rows = [
-        {"fuel": "natural_gas_m3", "quantity": 5000, "unit": "m3"},
-        {"fuel": "diesel_L", "quantity": 200, "unit": "L"},
-    ]
-    fuel_table = st.data_editor(pd.DataFrame(rows), num_rows="dynamic")
-    s1_rows = []
-    for _, r in fuel_table.iterrows():
-        f = FUELS.get(r["fuel"])
-        if f and r["quantity"]:
-            kg = f.ef_kgCO2_unit * float(r["quantity"])
-            s1_rows.append({"Fuel": f.name, "Qty": r["quantity"],
-                            "Unit": r["unit"],
-                            "EF kgCO2/unit": round(f.ef_kgCO2_unit, 3),
-                            "kgCO2e": round(kg, 1),
-                            "tCO2e": round(kg/1000, 3),
-                            "Source": "MEE App.A"})
-    s1 = pd.DataFrame(s1_rows)
-    st.dataframe(s1, use_container_width=True)
-    s1_total = s1["tCO2e"].sum() if len(s1) else 0
-    st.metric("Scope 1 total", f"{s1_total:.3f} tCO2e")
+    st.caption("Enter fuel use. Factors from MEE power-generation guideline App.A.")
+    with st.container(border=True):
+        rows = [
+            {"fuel": "natural_gas_m3", "quantity": 5000, "unit": "m3"},
+            {"fuel": "diesel_L", "quantity": 200, "unit": "L"},
+        ]
+        fuel_table = st.data_editor(
+            pd.DataFrame(rows), num_rows="dynamic",
+            column_config={
+                "fuel": st.column_config.SelectboxColumn(
+                    "Fuel", options=list(FUELS.keys()),
+                    help="Key from the MEE factor table"),
+                "quantity": st.column_config.NumberColumn("Quantity", min_value=0),
+            },
+            width="stretch")
+        s1_rows = []
+        for _, r in fuel_table.iterrows():
+            f = FUELS.get(r["fuel"])
+            if f and r["quantity"]:
+                kg = f.ef_kgCO2_unit * float(r["quantity"])
+                s1_rows.append({"Fuel": f.name, "Qty": r["quantity"],
+                                "Unit": r["unit"],
+                                "EF kgCO2/unit": round(f.ef_kgCO2_unit, 3),
+                                "kgCO2e": round(kg, 1),
+                                "tCO2e": round(kg/1000, 3),
+                                "Source": "MEE App.A"})
+        s1 = pd.DataFrame(s1_rows)
+        if len(s1):
+            st.dataframe(s1, width="stretch")
+        else:
+            st.info("Add a fuel row to see the breakdown.")
+        s1_total = s1["tCO2e"].sum() if len(s1) else 0
+        st.metric("Scope 1 total", f"{s1_total:.3f} tCO2e")
 
 # ========== SCOPE 2 ==========
 with tab2:
     st.header("Scope 2 — purchased electricity")
-    kwh = st.number_input("Annual electricity consumption (kWh)", value=500000, step=10000)
+    st.caption("Location-based method: consumption × regional grid factor.")
+    with st.container(border=True):
+        c1, c2 = st.columns([1, 1])
+        with c1:
+            kwh = st.number_input("Annual electricity consumption (kWh)",
+                                  value=500000, step=10000)
+        with c2:
+            st.metric("Scope 2 (location-based)", f"{kwh * grid_factor / 1000.0:.2f} tCO2e",
+                      help=f"{kwh:,} kWh x {grid_factor} kgCO2/kWh")
     s2 = kwh * grid_factor / 1000.0  # tCO2e
-    st.metric("Scope 2 (location-based)", f"{s2:.2f} tCO2e",
-              help=f"{kwh:,} kWh x {grid_factor} kgCO2/kWh")
     st.caption(f"Factor source: {GRID_SOURCE}")
 
 # ========== SCOPE 3 ==========
 with tab3:
     st.header("Scope 3 — selected categories")
-    c1, c2 = st.columns(2)
-    with c1:
-        st.subheader("Cat 3: T&D losses")
-        td = s2 * TD_LOSS_RATE
-        st.write(f"Grid T&D loss rate: {TD_LOSS_RATE*100:.1f}%")
-        st.write(f"Upstream T&D: **{td:.2f} tCO2e**")
+    with st.container(border=True):
+        c1, c2 = st.columns(2)
+        with c1:
+            st.subheader("Cat 3: T&D losses")
+            td = s2 * TD_LOSS_RATE
+            st.write(f"Grid T&D loss rate: {TD_LOSS_RATE*100:.1f}%")
+            st.write(f"Upstream T&D: **{td:.2f} tCO2e**")
 
-        st.subheader("Cat 6: Business travel")
-        flight_km = st.number_input("Long-haul flights (passenger-km/yr)", value=20000)
-        car_km = st.number_input("Work car travel (km/yr)", value=5000)
-        travel = (flight_km * TRAVEL_FACTORS["flight_long_haul"]
-                  + car_km * TRAVEL_FACTORS["car_petrol"]) / 1000.0
-        st.write(f"Business travel: **{travel:.2f} tCO2e**")
-    with c2:
-        st.subheader("Cat 7: Employee commuting")
-        employees = st.number_input("Number of employees", value=50)
-        commute_km_day = st.number_input("Avg one-way commute (km)", value=8)
-        commute_days = 230
-        commute = (employees * commute_km_day * 2 * commute_days
-                   * COMMUTE_FACTORS["metro"]) / 1_000_000.0
-        st.write(f"Commuting (metro): **{commute:.2f} tCO2e**")
+            st.subheader("Cat 6: Business travel")
+            flight_km = st.number_input("Long-haul flights (passenger-km/yr)", value=20000)
+            car_km = st.number_input("Work car travel (km/yr)", value=5000)
+            travel = (flight_km * TRAVEL_FACTORS["flight_long_haul"]
+                      + car_km * TRAVEL_FACTORS["car_petrol"]) / 1000.0
+            st.write(f"Business travel: **{travel:.2f} tCO2e**")
+        with c2:
+            st.subheader("Cat 7: Employee commuting")
+            employees = st.number_input("Number of employees", value=50)
+            commute_km_day = st.number_input("Avg one-way commute (km)", value=8)
+            commute_days = 230
+            commute = (employees * commute_km_day * 2 * commute_days
+                       * COMMUTE_FACTORS["metro"]) / 1_000_000.0
+            st.write(f"Commuting (metro): **{commute:.2f} tCO2e**")
 
-        st.subheader("Cat 1: Purchased goods (spend-based)")
-        spend = st.number_input("Annual procurement (CNY)", value=2_000_000)
-        purchased = spend * SPEND_FACTORS["manufactured_goods"] / 1000.0
-        st.write(f"Purchased goods: **{purchased:.2f} tCO2e** (rough IO estimate)")
+            st.subheader("Cat 1: Purchased goods (spend-based)")
+            spend = st.number_input("Annual procurement (CNY)", value=2_000_000)
+            purchased = spend * SPEND_FACTORS["manufactured_goods"] / 1000.0
+            st.write(f"Purchased goods: **{purchased:.2f} tCO2e** (rough IO estimate)")
 
     s3_total = td + travel + commute + purchased
     st.metric("Scope 3 (selected cats)", f"{s3_total:.2f} tCO2e")
@@ -112,86 +274,131 @@ with tab3:
 
 # ========== TOTAL ==========
 st.divider()
-st.subheader("Total GHG inventory")
-total = s1_total + s2 + s3_total
-st.metric("Total (Scope 1+2+3 selected)", f"{total:.2f} tCO2e")
+with st.container(border=True):
+    st.markdown('<span class="ocip-section">Total GHG inventory — Scope 1 + 2 + 3 (selected)</span>',
+                unsafe_allow_html=True)
+    total = s1_total + s2 + s3_total
+    st.metric("Total", f"{total:.2f} tCO2e",
+              help="Rolls up tabs 1–3 on the same ledger as the natural side (tab 4 / 8G).")
 
 # ========== BIOGENIC ==========
 with tab4:
     st.header("Biogenic flux — GBA coastal wetland")
+    st.caption("CarbonContinuumModel demo: GPP/T_air/soil-water forcing → NEE, burial, ε_C residual.")
+    with st.container(border=True):
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            gpp_amp = st.slider("GPP seasonal amplitude (gC/m²/day)", 1.0, 6.0, 3.0,
+                                key="b_gpp_amp")
+            gpp_base = st.slider("GPP base (gC/m²/day)", 2.0, 6.0, 4.0, key="b_gpp_base")
+        with c2:
+            t_amp = st.slider("Temperature amplitude (°C)", 4.0, 12.0, 8.0, key="b_t_amp")
+            t_base = st.slider("Mean annual temperature (°C)", 15.0, 28.0, 22.0,
+                               key="b_t_base")
+        with c3:
+            swc = st.slider("Soil water content (fraction)", 0.2, 0.9, 0.6, key="b_swc")
+            st.caption("Rain kept at 0 for the demo forcing.")
+
     from ucst_ccif import CarbonContinuumModel, ParameterSet
     T = 365
     doy = np.arange(T)
-    gpp = np.clip(4.0 + 3.0*np.sin(2*np.pi*(doy-120)/365.25), 0.5, 8.0)
-    T_air = 22.0 + 8.0*np.sin(2*np.pi*(doy-200)/365.25)
-    swc = np.full(T, 0.6)
+    gpp = np.clip(gpp_base + gpp_amp*np.sin(2*np.pi*(doy-120)/365.25), 0.5, 8.0)
+    T_air = t_base + t_amp*np.sin(2*np.pi*(doy-200)/365.25)
+    swc_arr = np.full(T, swc)
     rain = np.zeros(T)
     m = CarbonContinuumModel(ParameterSet())
-    s = m.run(gpp, T_air, swc, rain)
+    s = m.run(gpp, T_air, swc_arr, rain)
     c1, c2, c3 = st.columns(3)
-    c1.metric("Annual NEE", f"{s.nee.mean()*365:+.1f} gC m-2 yr-1")
+    c1.metric("Annual NEE", f"{s.nee.mean()*365:+.1f} gC m-2 yr-1",
+              help="Negative = net uptake")
     c2.metric("Blue carbon burial", f"{s.coastal_burial_cum:.1f} gC m-2 yr-1")
-    c3.metric("|eps_C|", f"{np.mean(np.abs(s.eps_C)):.4f}")
-    st.line_chart(pd.DataFrame({"day": doy, "NEE": s.nee}).set_index("day"))
+    c3.metric("|ε_C| residual", f"{np.mean(np.abs(s.eps_C)):.4f}",
+              help="Conservation residual — the audit flag, not hidden")
+    st.line_chart(pd.DataFrame({"day": doy, "NEE (gC/m²/d)": s.nee}).set_index("day"))
 
 # ========== LEAKAGE ==========
 with tab5:
     st.header("Leakage audit")
-    from ucst_ccif import audit_leakage
-    uploaded = st.file_uploader("Upload CSV with target + predictors", type=["csv"])
-    if uploaded:
-        df = pd.read_csv(uploaded)
-        tgt = st.selectbox("Target column", df.columns)
-        preds = [c for c in df.columns if c != tgt]
-        rep = audit_leakage(df, tgt, preds)
-        st.text(rep.summary())
-    else:
-        st.info("Upload a CSV to run the 3-step leakage audit.")
+    st.caption("3-step screen: predictor classification → correlation screen → no-leak refit. "
+               "Upload a CSV with one target + ≥1 predictor (≥30 rows recommended).")
+    with st.container(border=True):
+        uploaded = st.file_uploader("Upload CSV with target + predictors", type=["csv"])
+        if uploaded:
+            df = pd.read_csv(uploaded)
+            tgt = st.selectbox("Target column", df.columns)
+            preds = [c for c in df.columns if c != tgt]
+            from ucst_ccif import audit_leakage
+            rep = audit_leakage(df, tgt, preds)
+            st.text(rep.summary())
+            # classification table
+            if hasattr(rep, "classified"):
+                cls_df = pd.DataFrame({
+                    "Predictor": list(rep.classified.keys()),
+                    "Class": ["**LEAKY**" if v == "leaky" else "exogenous"
+                              for v in rep.classified.values()],
+                })
+                st.dataframe(cls_df, width="stretch")
+        else:
+            st.info("Upload a CSV to run the 3-step leakage audit. See tab 9 for the exact "
+                    "column format and a copy-paste template.")
 
 # ========== NGFS ==========
 with tab6:
     st.header("NGFS Phase V scenarios")
+    st.caption("Carbon-price & physical-risk lens for stress-testing your inventory.")
     ngfs = {
         "Orderly": {"carbon_price_2030": 150, "physical_risk": "low"},
         "Disorderly": {"carbon_price_2030": 350, "physical_risk": "medium"},
         "Hot House": {"carbon_price_2030": 15, "physical_risk": "high"},
     }
-    sc = st.selectbox("Scenario", list(ngfs.keys()))
-    st.json(ngfs[sc])
+    with st.container(border=True):
+        sc = st.selectbox("Scenario", list(ngfs.keys()))
+        c1, c2 = st.columns(2)
+        c1.metric("Carbon price 2030 (US$/tCO2)", ngfs[sc]["carbon_price_2030"])
+        c2.metric("Physical risk", ngfs[sc]["physical_risk"])
+        st.caption(f"Policy lens: under {sc.lower()}, a {ngfs[sc]['carbon_price_2030']} "
+                   f"$/t price on your {total:.1f} tCO₂e → "
+                   f"US${ngfs[sc]['carbon_price_2030'] * total:,.0f} exposure.")
 
 # ========== PDF ==========
 with tab7:
     st.header("Export ISO 14064-3 audit trail")
-    if st.button("Generate PDF"):
-        from reportlab.lib.pagesizes import A4
-        from reportlab.platypus import SimpleDocTemplate, Paragraph
-        from reportlab.lib.styles import getSampleStyleSheet
-        buf = io.BytesIO()
-        doc = SimpleDocTemplate(buf, pagesize=A4)
-        styles = getSampleStyleSheet()
-        story = [
-            Paragraph("UCST-CCIF Carbon Audit Report", styles["Title"]),
-            Paragraph(f"Generated: {datetime.now().isoformat(timespec='seconds')}", styles["Normal"]),
-            Paragraph(f"Boundary: corporate operations, {region} grid", styles["Normal"]),
-            Paragraph(f"Scope 1: {s1_total:.3f} tCO2e", styles["Normal"]),
-            Paragraph(f"Scope 2: {s2:.2f} tCO2e (factor {grid_factor} kg/kWh, MEE 2022)", styles["Normal"]),
-            Paragraph(f"Scope 3 (selected): {s3_total:.2f} tCO2e", styles["Normal"]),
-            Paragraph(f"Total: {total:.2f} tCO2e", styles["Heading2"]),
-            Paragraph("Factors: MEE Announcement 2024 No.33; MEE power guideline App.A.", styles["Normal"]),
-            Paragraph("Verification: third-party ISO 14064-3 assurance required before disclosure.", styles["Normal"]),
-        ]
-        doc.build(story)
-        st.download_button("Download", buf.getvalue(),
-                           file_name="ucst_ccif_audit.pdf", mime="application/pdf")
+    st.caption("Evidence pack: numbers, factors, residual and verification note.")
+    with st.container(border=True):
+        if st.button("Generate PDF"):
+            from reportlab.lib.pagesizes import A4
+            from reportlab.platypus import SimpleDocTemplate, Paragraph
+            from reportlab.lib.styles import getSampleStyleSheet
+            buf = io.BytesIO()
+            doc = SimpleDocTemplate(buf, pagesize=A4)
+            styles = getSampleStyleSheet()
+            story = [
+                Paragraph("OCIP — Carbon Audit Report", styles["Title"]),
+                Paragraph(f"Generated: {datetime.now().isoformat(timespec='seconds')}", styles["Normal"]),
+                Paragraph(f"Platform: OCIP {APP_VERSION} (UCST-CCIF engine) · {GITHUB_URL}", styles["Normal"]),
+                Paragraph(f"Boundary: corporate operations, {region} grid", styles["Normal"]),
+                Paragraph(f"Scope 1: {s1_total:.3f} tCO2e", styles["Normal"]),
+                Paragraph(f"Scope 2: {s2:.2f} tCO2e (factor {grid_factor} kg/kWh, MEE 2022)", styles["Normal"]),
+                Paragraph(f"Scope 3 (selected): {s3_total:.2f} tCO2e", styles["Normal"]),
+                Paragraph(f"Total: {total:.2f} tCO2e", styles["Heading2"]),
+                Paragraph("Factors: MEE Announcement 2024 No.33; MEE power guideline App.A.", styles["Normal"]),
+                Paragraph("Leakage audit: run tab 5 on site flux data before quoting any model R².", styles["Normal"]),
+                Paragraph("Verification: third-party ISO 14064-3 assurance required before disclosure.", styles["Normal"]),
+            ]
+            doc.build(story)
+            st.download_button("Download PDF", buf.getvalue(),
+                               file_name="ocip_audit_report.pdf", mime="application/pdf")
 
 # ========== ANTHROPOGENIC ==========
 with tab8:
     st.header("Anthropogenic — human sectors & the nature ledger")
     st.caption("One ledger, two sides: what humans emit vs what nature absorbs. "
-               "Sources: CEADs provincial inventory 2022 (Guangdong) · Global Carbon Budget 2025")
+               "Sources: CEADs provincial inventory 2022 (Guangdong) · Global Carbon Budget 2025 · "
+               "HK EPD GHG inventory 2023")
 
     # --- A. GBA human sectors (CEADs 2022, Guangdong) ---
-    st.subheader("A. GBA human sectors — Guangdong 2022 (CEADs, Mt CO₂)")
+    st.markdown('<span class="ocip-section">A. GBA human sectors — Guangdong 2022 (CEADs, Mt CO₂)</span>',
+                unsafe_allow_html=True)
     gd_sectors = {
         "Electric power": 379.2, "Cement & minerals": 57.7,
         "Transport & logistics": 46.6, "Iron & steel": 34.7,
@@ -209,7 +416,8 @@ with tab8:
               help="Electric power dominates — the CBAM/ETS hotspot for GBA exporters")
 
     # --- B. Global human emissions (GCB2025, 2024) ---
-    st.subheader("B. Global human emissions — fossil + land-use (GCB2025, 2024)")
+    st.markdown('<span class="ocip-section">B. Global human emissions — fossil + land-use (GCB2025, 2024)</span>',
+                unsafe_allow_html=True)
     fossil = {"Coal": 4.31, "Oil": 3.40, "Gas": 2.19, "Cement": 0.40, "Other": 0.42}
     df_fossil = pd.DataFrame({"Fuel": list(fossil),
                               "GtC per yr": list(fossil.values())}).set_index("Fuel")
@@ -221,7 +429,8 @@ with tab8:
               help="≈ 49% of emissions stay in the atmosphere; the rest goes to sinks")
 
     # --- C. Nature ledger ---
-    st.subheader("C. Nature ledger — where the rest goes (GCB2025)")
+    st.markdown('<span class="ocip-section">C. Nature ledger — where the rest goes (GCB2025)</span>',
+                unsafe_allow_html=True)
     n1, n2, n3 = st.columns(3)
     n1.metric("Ocean sink", "3.1 GtC/yr", "≈ 11.4 GtCO₂/yr")
     n2.metric("Land sink", "2.5 GtC/yr", "≈ 9.2 GtCO₂/yr (incl. blue carbon)")
@@ -231,7 +440,8 @@ with tab8:
                "flux, blue carbon) on one ledger — L1 point flux to L5 policy.")
 
     # --- D. HK sectors (EPD GHG inventory 2023) ---
-    st.subheader("D. Hong Kong sectors — GHG inventory 2023 (EPD, kt CO₂e)")
+    st.markdown('<span class="ocip-section">D. Hong Kong sectors — GHG inventory 2023 (EPD, kt CO₂e)</span>',
+                unsafe_allow_html=True)
     hk_sectors = {
         "Electricity & energy ind.": 21200, "Transport": 6330,
         "Industrial processes & other": 2920, "Waste": 2410,
@@ -251,84 +461,91 @@ with tab8:
                "if your intensity is above the sector average, the ledger flags it.")
 
     # --- E. CH4 by sector: rice (DNDC-lite) + landfill (IPCC Tier-1) ---
-    st.subheader("E. CH₄ by sector — rice paddies & landfills (GBA)")
+    st.markdown('<span class="ocip-section">E. CH₄ by sector — rice paddies & landfills (GBA)</span>',
+                unsafe_allow_html=True)
     c_rice, c_land = st.columns(2)
     with c_rice:
-        from ucst_ccif.dndc_lite import rice_ch4_season, RICE_WATER_REGIMES
-        st.markdown("**Rice paddies (DNDC-lite, IPCC scaling)**")
-        regime = st.selectbox("Water regime", list(RICE_WATER_REGIMES), key="rice_regime")
-        rice_days = st.slider("Season length (days)", 90, 180, 120, key="rice_days")
-        rice_ha = st.number_input("Area (ha)", 1.0, 10000.0, 100.0, key="rice_ha")
-        try:
-            est = rice_ch4_season(regime, rice_days, area_ha=rice_ha)
-            st.metric("Seasonal CH₄", f"{est.total_kgCH4:.1f} kg",
-                      f"{est.total_tCO2e:.1f} tCO₂e (GWP28)")
-        except KeyError as e:
-            st.error(str(e))
+        with st.container(border=True):
+            from ucst_ccif.dndc_lite import rice_ch4_season, RICE_WATER_REGIMES
+            st.markdown("**Rice paddies (DNDC-lite, IPCC scaling)**")
+            regime = st.selectbox("Water regime", list(RICE_WATER_REGIMES), key="rice_regime")
+            rice_days = st.slider("Season length (days)", 90, 180, 120, key="rice_days")
+            rice_ha = st.number_input("Area (ha)", 1.0, 10000.0, 100.0, key="rice_ha")
+            try:
+                est = rice_ch4_season(regime, rice_days, area_ha=rice_ha)
+                st.metric("Seasonal CH₄", f"{est.total_kgCH4:.1f} kg",
+                          f"{est.total_tCO2e:.1f} tCO₂e (GWP28)")
+            except KeyError as e:
+                st.error(str(e))
     with c_land:
-        from ucst_ccif.landfill import landfill_ch4_tier1, LANDFILL_MCF
-        st.markdown("**Landfills (IPCC 2006/2019 Tier-1)**")
-        msw_t = st.number_input("Waste disposed (t/yr)", 0.0, 10_000_000.0,
-                                1_500_000.0, step=50_000.0, key="land_msw")
-        lf_type = st.selectbox("Landfill type",
-                               ["managed_anaerobic", "managed_semi_aerobic",
-                                "unmanaged_deep", "unmanaged_shallow",
-                                "uncategorised"], key="land_type")
-        lr = landfill_ch4_tier1(msw_t, mcf_key=lf_type)
-        st.metric("Landfill CH₄", f"{lr.ch4_t:.1f} t CH₄/yr",
-                  f"{lr.co2e_t_ar5:.1f} tCO₂e/yr (AR5 GWP28)")
-        st.caption(f"e.g. 1.5 Mt MSW/yr, managed anaerobic → "
-                   f"{landfill_ch4_tier1(1_500_000.0).ch4_t:.1f} t CH₄ ≈ "
-                   f"{landfill_ch4_tier1(1_500_000.0).co2e_t_ar5:.1f} tCO₂e/yr")
+        with st.container(border=True):
+            from ucst_ccif.landfill import landfill_ch4_tier1, LANDFILL_MCF
+            st.markdown("**Landfills (IPCC 2006/2019 Tier-1)**")
+            msw_t = st.number_input("Waste disposed (t/yr)", 0.0, 10_000_000.0,
+                                    1_500_000.0, step=50_000.0, key="land_msw")
+            lf_type = st.selectbox("Landfill type",
+                                   ["managed_anaerobic", "managed_semi_aerobic",
+                                    "unmanaged_deep", "unmanaged_shallow",
+                                    "uncategorised"], key="land_type")
+            lr = landfill_ch4_tier1(msw_t, mcf_key=lf_type)
+            st.metric("Landfill CH₄", f"{lr.ch4_t:.1f} t CH₄/yr",
+                      f"{lr.co2e_t_ar5:.1f} tCO₂e/yr (AR5 GWP28)")
+            st.caption(f"e.g. 1.5 Mt MSW/yr, managed anaerobic → "
+                       f"{landfill_ch4_tier1(1_500_000.0).ch4_t:.1f} t CH₄ ≈ "
+                       f"{landfill_ch4_tier1(1_500_000.0).co2e_t_ar5:.1f} tCO₂e/yr")
     st.caption("CH₄ has ~28× GWP of CO₂: the GBA CH₄ wedge is rice + landfills "
                "+ tidal wetlands — OCIP audits all three on one CH₄ ledger.")
 
     # --- F. CCER mangrove restoration lookup ---
-    st.subheader("F. CCER mangrove restoration — project lookup")
-    st.markdown("Methodology: **CCER—14—002—V02 红树林营造** (2026 revision, "
-                "age-based lookup; baseline = unvegetated tidal flat / retired shrimp pond).")
-    f1, f2, f3 = st.columns(3)
-    f1.metric("Default crediting period", "20–40 yr", help="CCER methodology 计入期")
-    f2.metric("GD mangrove C stock", "3.22 Mt C",
-              help="Guangdong province (Kandelia obovata dominant)")
-    f3.metric("GD sink potential", "6.6–18.2 tCO₂e/ha/yr",
-              help="55 km² target → 36,171–99,891 tCO₂e/yr")
-    proj_area = st.number_input("Your project area (ha)", 0.0, 100000.0,
-                                100.0, key="ccer_area")
-    proj_age = st.slider("Mean stand age (yr)", 1, 50, 10, key="ccer_age")
-    # conservative age-based carbon accumulation for subtropical mangroves
-    agb_accum = 0.35 * proj_age + 1.2          # Mg C/ha (above+below, saturating proxy)
-    soil_acc = 0.35                             # Mg C/ha/yr burial
-    tot_acc = agb_accum + soil_acc * proj_age   # Mg C/ha cumulative
-    co2_per_ha = tot_acc * 44.0 / 12.0
-    st.metric("Estimated cumulative carbon", f"{co2_per_ha * proj_area:,.0f} tCO₂e",
-              f"{co2_per_ha:.1f} tCO₂e/ha over {proj_age} yr (order-of-magnitude)")
-    st.caption("Lookup is a scoping estimate for pitch purposes — "
-               "official crediting requires CCER field measurement per the methodology "
-               "age-based tables (App. A, Guangdong region).")
+    st.markdown('<span class="ocip-section">F. CCER mangrove restoration — project lookup</span>',
+                unsafe_allow_html=True)
+    with st.container(border=True):
+        st.markdown("Methodology: **CCER—14—002—V02 红树林营造** (2026 revision, "
+                    "age-based lookup; baseline = unvegetated tidal flat / retired shrimp pond).")
+        f1, f2, f3 = st.columns(3)
+        f1.metric("Default crediting period", "20–40 yr", help="CCER methodology 计入期")
+        f2.metric("GD mangrove C stock", "3.22 Mt C",
+                  help="Guangdong province (Kandelia obovata dominant)")
+        f3.metric("GD sink potential", "6.6–18.2 tCO₂e/ha/yr",
+                  help="55 km² target → 36,171–99,891 tCO₂e/yr")
+        proj_area = st.number_input("Your project area (ha)", 0.0, 100000.0,
+                                    100.0, key="ccer_area")
+        proj_age = st.slider("Mean stand age (yr)", 1, 50, 10, key="ccer_age")
+        # conservative age-based carbon accumulation for subtropical mangroves
+        agb_accum = 0.35 * proj_age + 1.2          # Mg C/ha (above+below, saturating proxy)
+        soil_acc = 0.35                             # Mg C/ha/yr burial
+        tot_acc = agb_accum + soil_acc * proj_age   # Mg C/ha cumulative
+        co2_per_ha = tot_acc * 44.0 / 12.0
+        st.metric("Estimated cumulative carbon", f"{co2_per_ha * proj_area:,.0f} tCO₂e",
+                  f"{co2_per_ha:.1f} tCO₂e/ha over {proj_age} yr (order-of-magnitude)")
+        st.caption("Lookup is a scoping estimate for pitch purposes — "
+                   "official crediting requires CCER field measurement per the methodology "
+                   "age-based tables (App. A, Guangdong region).")
 
     # --- G. Anthropogenic vs natural — your own carbon balance sheet ---
-    st.subheader("G. Your own carbon balance sheet — anthropogenic vs natural")
+    st.markdown('<span class="ocip-section">G. Your own carbon balance sheet — anthropogenic vs natural</span>',
+                unsafe_allow_html=True)
     st.markdown("Same ledger, your scale: factory electricity vs your wetland/rice area.")
-    b1, b2 = st.columns(2)
-    with b1:
-        own_kwh = st.number_input("Your factory electricity (kWh/yr)", 0.0,
-                                  1_000_000_000.0, 500_000.0, step=50_000.0,
-                                  key="own_kwh")
-        own_t = own_kwh * grid_factor / 1000.0   # tCO2e
-        st.metric("Your Scope 2 (anthropogenic)", f"{own_t:.1f} tCO₂e/yr",
-                  f"× {grid_factor} kgCO₂/kWh (Guangdong grid)")
-    with b2:
-        own_ha = st.number_input("Your wetland / rice area (ha)", 0.0,
-                                 100000.0, 10.0, key="own_ha")
-        nee_g = -155.6                            # gC/m²/yr (GBA wetland demo, synthetic)
-        own_sink = abs(nee_g) * own_ha * 10000.0 * 44.0 / 12.0 / 1e6  # tCO2e
-        st.metric("Your nature sink (biogenic)", f"{own_sink:.1f} tCO₂e/yr",
-                  f"@ −{abs(nee_g):.0f} gC/m²/yr NEE (demo forcing)")
-    st.metric("Net position (anthropogenic − natural)",
-              f"{own_t - own_sink:+,.1f} tCO₂e/yr",
-              delta=f"{own_sink / own_t * 100:.1f}% of your emissions offset by your land"
-                    if own_t > 0 else "enter factory load to compare")
+    with st.container(border=True):
+        b1, b2 = st.columns(2)
+        with b1:
+            own_kwh = st.number_input("Your factory electricity (kWh/yr)", 0.0,
+                                      1_000_000_000.0, 500_000.0, step=50_000.0,
+                                      key="own_kwh")
+            own_t = own_kwh * grid_factor / 1000.0   # tCO2e
+            st.metric("Your Scope 2 (anthropogenic)", f"{own_t:.1f} tCO₂e/yr",
+                      f"× {grid_factor} kgCO₂/kWh (Guangdong grid)")
+        with b2:
+            own_ha = st.number_input("Your wetland / rice area (ha)", 0.0,
+                                     100000.0, 10.0, key="own_ha")
+            nee_g = -155.6                            # gC/m²/yr (GBA wetland demo, synthetic)
+            own_sink = abs(nee_g) * own_ha * 10000.0 * 44.0 / 12.0 / 1e6  # tCO2e
+            st.metric("Your nature sink (biogenic)", f"{own_sink:.1f} tCO₂e/yr",
+                      f"@ −{abs(nee_g):.0f} gC/m²/yr NEE (demo forcing)")
+        st.metric("Net position (anthropogenic − natural)",
+                  f"{own_t - own_sink:+,.1f} tCO₂e/yr",
+                  delta=f"{own_sink / own_t * 100:.1f}% of your emissions offset by your land"
+                        if own_t > 0 else "enter factory load to compare")
     st.caption("This is the L5→L2 drill-down: HK/Guangdong sector data sets the scale, "
                "your numbers set the subject, and ε_C-style reconciliation flags "
                "whether the two sides of your ledger balance.")
@@ -367,7 +584,7 @@ with tab9:
         "|---|---|---|\n"
         "| NEE / GPP / ER (flux) | FLUXNET Data System → fluxnet.org, per site | Tier-1 sites CC-BY-4.0 free |\n"
         "| Flux — Asia analogue | JapanFlux2024 (Kyushu/Okinawa) → japanflux.org | CC-BY-4.0, best near-term |\n"
-        "| Flux — mainland China | ChinaFLUX (CAS) → chinaflux.org | **Restricted — MOU via CityU/SUSTech/SYSU (months 0–3)** |\n"
+        "| Flux — mainland China | ChinaFLUX (CAS) → chinaflux.org · **now on NESDC** (e.g. Jinfo forest 2020–2022) | CC BY-NC 4.0, protected until 2026-12-15; commercial licence via MOU |\n"
         "| Flux — build your own tower | EddyPro 7 (free) → REddyProc gap-fill → ONEFlux QC | fully open-source |\n"
         "| Meteorology (wind/ustar/T/CO₂) | tower meteorology; ERA5 (ECMWF); Open-Meteo API | free |\n"
         "| Emission inventories / factors | CEADs provincial (your folder), HK EPD, EDGAR, GCB2025 | free |\n"
@@ -554,3 +771,102 @@ with tab9:
                "factors) → benchmark vs HK structure (tab 8D) → your natural assets "
                "(tab 8F–G) → leak check (tab 5) → net position. Every number on "
                "this page is traceable to a source or a formula in this app.")
+
+# ========== 10. AUDIT REPORT ==========
+with tab_report:
+    st.header("Audit report — 7-step pipeline, 8 artifacts")
+    st.caption("Runs S1 (boundary) → S2 (factors) → S3 (conservation, Eq.1) → "
+               "S4 (scale) → S5 (additionality, Eq.3) → S6 (leakage, Eq.7) → "
+               "S7 (uncertainty) on the four ledgers uploaded in tab 0.")
+
+    a1, a2, a3 = st.columns(3)
+    with a1:
+        claim = st.number_input("Company's claimed removal (tCO₂e/yr)",
+                                0.0, 1e9, 420.0, step=10.0,
+                                help="What the company books as 'we reduced X t' — "
+                                     "compared against independent observation in S3")
+    with a2:
+        agent_col = st.text_input("Agent-state column (Eq.2, optional)",
+                                  placeholder="e.g. water_level / mangrove_age",
+                                  help="Column in the flux ledger that carries the "
+                                       "management signal; attribution split is skipped "
+                                       "if left empty")
+    with a3:
+        area = st.session_state.get("ocip_area", 100.0)
+        st.metric("Area used for gC → tCO₂e", f"{area:,.1f} ha",
+                  help="Set in tab 0 (Upload)")
+
+    if st.button("Run the audit", type="primary"):
+        from ucst_ccif import run_audit
+        rep = run_audit(
+            activity_df=st.session_state.get("ocip_activity"),
+            flux_df=st.session_state.get("ocip_flux"),
+            stock_df=st.session_state.get("ocip_stock"),
+            intervention_df=st.session_state.get("ocip_intervention"),
+            area_ha=(area if area > 0 else None),
+            claimed_removals_tco2e=(claim if claim > 0 else None),
+            agent_col=(agent_col.strip() if agent_col.strip() else None),
+        )
+        st.session_state["ocip_report"] = rep
+        st.session_state["ocip_report_text"] = rep.summary()
+
+    rep = st.session_state.get("ocip_report")
+    if rep is not None:
+        # --- certificate + headline metrics ---
+        cert_color = {"PASS": "#1F7A3D", "FAIL": "#B23A3A",
+                      "REVIEW": "#C9A227", "INCOMPLETE": "#5C6B7A"}
+        cc = next((v for k, v in cert_color.items()
+                   if rep.certificate_status.startswith(k)), "#5C6B7A")
+        st.markdown(
+            f"<div style='border-left:6px solid {cc}; padding:.4rem .9rem; "
+            f"background:#F7F9FB; border-radius:8px; margin:.3rem 0'>"
+            f"<b style='font-size:1.25rem;color:{cc}'>{rep.certificate_status}</b>"
+            f"<div style='color:#47596B'>Audit certificate — the verdict of the "
+            f"8-artifact report.</div></div>", unsafe_allow_html=True)
+
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("Verified emissions",
+                  (f"{rep.emissions_tco2e:,.1f} ± {rep.emissions_u95_tco2e:,.1f}"
+                   " tCO₂e" if rep.emissions_tco2e is not None else "—"),
+                  help="Artifact 1: verified emission interval (S2 + S7)")
+        m2.metric("Verified removals",
+                  (f"{rep.removals_tco2e:,.1f} ± {rep.removals_u95_tco2e:,.1f}"
+                   " tCO₂e" if rep.removals_tco2e is not None else "—"),
+                  help="Artifact 2: verified removal interval (S3)")
+        m3.metric("Conservation residual ε_C",
+                  (f"{rep.residual_eC_tco2e:+,.1f} tCO₂e"
+                   if rep.residual_eC_tco2e is not None else "—"),
+                  help="Artifact 3: observed − claimed. Negative = over-claim (S3)")
+        m4.metric("Leakage flag",
+                  {"red": "🔴 RED — leaky predictors",
+                   "amber": "🟠 AMBER", "green": "🟢 GREEN — clean",
+                   "grey": "⚪ no flux data"}.get(rep.leakage_ryg, "—"),
+                  help="Artifact 5: RYG status of the flux model (S6, Eq.7)")
+
+        with st.expander("Stage log (S1–S7)", expanded=True):
+            st.dataframe(pd.DataFrame([
+                {"Stage": f"S{s.stage}", "Name": s.name, "Status": s.status,
+                 "Detail": s.detail} for s in rep.stages
+            ]), width="stretch")
+        if rep.data_gaps:
+            with st.expander("Reported data gaps (never silently estimated)",
+                             expanded=True):
+                for g in rep.data_gaps:
+                    st.markdown(f"- {g}")
+        with st.expander("Full 8-artifact payload (JSON)"):
+            st.json(rep.artifacts())
+        if rep.leak_free_gain_pct is not None:
+            st.info(f"Leakage-free refit (step 3): apparent gain from leaky "
+                    f"predictors = {rep.leak_free_gain_pct:+.1f}% — "
+                    f"see tab 5 for details.")
+    else:
+        st.info("Upload at least the activity ledger + one removal observation "
+                "in tab 0, then press **Run the audit**.")
+
+# ------------------------------------------------------------------
+st.markdown(f"""
+<div class="ocip-footer">
+  OCIP {APP_VERSION} · UCST-CCIF engine · {GITHUB_URL} · DOI {DOI_URL}<br/>
+  The audit is the product — not the number.
+</div>
+""", unsafe_allow_html=True)
